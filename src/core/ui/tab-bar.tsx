@@ -10,8 +10,8 @@ import { PressableScale } from '@/core/ui/pressable-scale';
 import { ThemedText } from '@/core/ui/themed-text';
 
 const tabIcons: Record<string, IconName> = {
-  index: 'today',
-  habits: 'habits',
+  index: 'checkCircle',
+  habits: 'streak',
   settings: 'settings',
 };
 

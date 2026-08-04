@@ -279,10 +279,13 @@ export default function HabitFormScreen() {
           <ThemedText variant="sectionHeader" color="secondary">
             {strings.form.icon.toUpperCase()}
           </ThemedText>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: theme.spacing.sm, paddingVertical: 3 }}
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: theme.spacing.sm,
+              paddingVertical: 3,
+            }}
           >
             {habitIcons.map((candidate) => {
               const selected = candidate === icon;
@@ -307,7 +310,7 @@ export default function HabitFormScreen() {
                 </PressableScale>
               );
             })}
-          </ScrollView>
+          </View>
         </Enter>
 
         <Enter index={4} style={{ gap: theme.spacing.sm }}>

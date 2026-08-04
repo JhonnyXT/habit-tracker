@@ -22,7 +22,6 @@ import {
   HABIT_ROW_SEPARATOR_INSET,
 } from '@/features/habits/presentation/components/habit-row';
 
-const SLOT = HABIT_ROW_HEIGHT;
 const LONG_PRESS_MS = 220;
 const LIFT_SCALE = 1.03;
 const LIFT_ELEVATION = 12;
@@ -55,13 +54,15 @@ type DraggableRowProps = {
   index: number;
   positions: SharedValue<Positions>;
   count: number;
+  slot: number;
   openId: SharedValue<string | null>;
   onTap: () => void;
   onCommit: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
   accessibilityLabel: string;
   checked: boolean;
+  role: 'checkbox' | 'button';
   children: React.ReactNode;
 };
 
@@ -70,6 +71,7 @@ function DraggableRow({
   index,
   positions,
   count,
+  slot,
   openId,
   onTap,
   onCommit,
@@ -77,12 +79,14 @@ function DraggableRow({
   onDelete,
   accessibilityLabel,
   checked,
+  role,
   children,
 }: DraggableRowProps) {
   const theme = useAppTheme();
   const reducedMotion = useReducedMotion();
+  const swipeable = Boolean(onEdit && onDelete);
 
-  const top = useSharedValue(index * SLOT);
+  const top = useSharedValue(index * slot);
   const startTop = useSharedValue(0);
   const isActive = useSharedValue(false);
   const isPressed = useSharedValue(false);
@@ -112,7 +116,7 @@ function DraggableRow({
     () => positions.value[id],
     (current, previous) => {
       if (current === undefined || current === previous || isActive.value) return;
-      top.value = withSpring(current * SLOT, springTokens.default);
+      top.value = withSpring(current * slot, springTokens.default);
     },
   );
 
@@ -141,7 +145,7 @@ function DraggableRow({
     .onUpdate((event) => {
       top.value = startTop.value + event.translationY;
 
-      const target = clamp(Math.round(top.value / SLOT), 0, count - 1);
+      const target = clamp(Math.round(top.value / slot), 0, count - 1);
       const currentIndex = positions.value[id];
       if (currentIndex !== undefined && target !== currentIndex) {
         positions.value = shiftPositions(positions.value, currentIndex, target);
@@ -152,7 +156,7 @@ function DraggableRow({
       isActive.value = false;
       const settled = positions.value[id] ?? index;
 
-      top.value = withSpring(settled * SLOT, {
+      top.value = withSpring(settled * slot, {
         ...springTokens.momentum,
         velocity: event.velocityY,
       });
@@ -194,7 +198,9 @@ function DraggableRow({
       }
     });
 
-  const gesture = Gesture.Race(swipe, Gesture.Exclusive(drag, tap));
+  const gesture = swipeable
+    ? Gesture.Race(swipe, Gesture.Exclusive(drag, tap))
+    : Gesture.Exclusive(drag, tap);
 
   const style = useAnimatedStyle(() => {
     const lift = isActive.value ? 1 : 0;
@@ -222,7 +228,11 @@ function DraggableRow({
 
   const slideStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: offsetX.value }],
-    backgroundColor: theme.colors.surface.secondary,
+    backgroundColor: swipeable ? theme.colors.surface.secondary : 'transparent',
+  }));
+
+  const actionsStyle = useAnimatedStyle(() => ({
+    opacity: clamp(Math.abs(offsetX.value) / 4, 0, 1),
   }));
 
   const editStyle = useAnimatedStyle(() => {
@@ -238,7 +248,11 @@ function DraggableRow({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={style}>
-        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+        {swipeable ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }, actionsStyle]}
+        >
           <Pressable
             onPress={onEdit}
             accessibilityRole="button"
@@ -278,25 +292,32 @@ function DraggableRow({
               <Icon name="trash" size={20} color={theme.colors.text.onSolid} />
             </Animated.View>
           </Pressable>
-        </View>
+        </Animated.View>
+        ) : null}
 
         <Animated.View
           accessible
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked }}
+          accessibilityRole={role}
+          accessibilityState={role === 'checkbox' ? { checked } : undefined}
           accessibilityLabel={accessibilityLabel}
           accessibilityHint={
-            checked
-              ? 'Double tap to mark as not done. Touch and hold to reorder.'
-              : 'Double tap to mark as done. Touch and hold to reorder.'
+            role === 'button'
+              ? 'Double tap to open. Touch and hold to reorder.'
+              : checked
+                ? 'Double tap to mark as not done. Touch and hold to reorder.'
+                : 'Double tap to mark as done. Touch and hold to reorder.'
           }
-          accessibilityActions={[
-            { name: 'edit', label: strings.today.swipeEdit },
-            { name: 'delete', label: strings.today.swipeDelete },
-          ]}
+          accessibilityActions={
+            swipeable
+              ? [
+                  { name: 'edit', label: strings.today.swipeEdit },
+                  { name: 'delete', label: strings.today.swipeDelete },
+                ]
+              : undefined
+          }
           onAccessibilityAction={(event) => {
-            if (event.nativeEvent.actionName === 'edit') onEdit();
-            if (event.nativeEvent.actionName === 'delete') onDelete();
+            if (event.nativeEvent.actionName === 'edit') onEdit?.();
+            if (event.nativeEvent.actionName === 'delete') onDelete?.();
           }}
           style={slideStyle}
         >
@@ -314,10 +335,13 @@ type DraggableHabitListProps<T> = {
 
   accessibilityLabelFor: (item: T) => string;
   isChecked: (item: T) => boolean;
+  rowRole?: 'checkbox' | 'button';
   onToggle: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
-  onEdit: (id: string) => void;
-  onDelete: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  slot?: number;
+  separators?: boolean;
 };
 
 export function DraggableHabitList<T>({
@@ -330,6 +354,9 @@ export function DraggableHabitList<T>({
   onReorder,
   onEdit,
   onDelete,
+  slot = HABIT_ROW_HEIGHT,
+  separators = true,
+  rowRole = 'checkbox',
 }: DraggableHabitListProps<T>) {
   const ids = useMemo(() => items.map(keyExtractor), [items, keyExtractor]);
   const positions = useSharedValue<Positions>({});
@@ -355,7 +382,7 @@ export function DraggableHabitList<T>({
   }, [positions, onReorder]);
 
   return (
-    <View style={{ height: items.length * SLOT }}>
+    <View style={{ height: items.length * slot, overflow: 'hidden' }}>
       {items.map((item, index) => {
         const id = keyExtractor(item);
         return (
@@ -365,26 +392,28 @@ export function DraggableHabitList<T>({
             index={index}
             positions={positions}
             count={items.length}
+            slot={slot}
             openId={openId}
             onTap={() => onToggle(id)}
             onCommit={commit}
-            onEdit={() => onEdit(id)}
-            onDelete={() => onDelete(id)}
+            onEdit={onEdit ? () => onEdit(id) : undefined}
+            onDelete={onDelete ? () => onDelete(id) : undefined}
             accessibilityLabel={accessibilityLabelFor(item)}
             checked={isChecked(item)}
+            role={rowRole}
           >
             {renderItem(item)}
           </DraggableRow>
         );
       })}
 
-      {items.slice(1).map((item, index) => (
+      {(separators ? items.slice(1) : []).map((item, index) => (
         <View
           key={`separator-${keyExtractor(item)}`}
           pointerEvents="none"
           style={{
             position: 'absolute',
-            top: (index + 1) * SLOT,
+            top: (index + 1) * slot,
             left: HABIT_ROW_SEPARATOR_INSET,
             right: 0,
             height: 1,

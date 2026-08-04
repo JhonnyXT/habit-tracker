@@ -10,6 +10,8 @@ import type { HabitSummary } from '@/features/habits/domain/use-cases/get-habits
 
 const HEATMAP_DAYS = 70;
 
+export const HABIT_CARD_HEIGHT = 76;
+
 function recentValues(history: string[], length: number): number[] {
   const completed = new Set(history);
   const end = todayDate();
@@ -19,26 +21,34 @@ function recentValues(history: string[], length: number): number[] {
 }
 
 type HabitCardProps = {
+  interactive?: boolean;
   summary: HabitSummary;
   muted?: boolean;
 };
 
-export function HabitCard({ summary, muted = false }: HabitCardProps) {
+export function HabitCard({ summary, muted = false, interactive = true }: HabitCardProps) {
   const theme = useAppTheme();
   const { habit, streaks, history } = summary;
   const recent = recentValues(history, HEATMAP_DAYS);
 
+  const Container = interactive ? PressableScale : View;
+
   return (
-    <PressableScale
-      onPress={() => router.push(`/habit/${habit.id}`)}
-      accessibilityRole="button"
-      accessibilityLabel={`${habit.name}, ${describeStreak(streaks)}`}
-      activeScale={0.985}
+    <Container
+      {...(interactive
+        ? {
+            onPress: () => router.push(`/habit/${habit.id}`),
+            accessibilityRole: 'button' as const,
+            accessibilityLabel: `${habit.name}, ${describeStreak(streaks)}`,
+            activeScale: 0.985,
+          }
+        : {})}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         gap: theme.spacing.md,
-        padding: theme.spacing.md,
+        paddingHorizontal: theme.spacing.md,
+        height: HABIT_CARD_HEIGHT,
         borderRadius: theme.radius.lg,
         backgroundColor: theme.colors.surface.secondary,
         opacity: muted ? 0.6 : 1,
@@ -47,8 +57,10 @@ export function HabitCard({ summary, muted = false }: HabitCardProps) {
       <IconWell name={habit.icon} color={habit.color} size={36} muted={muted} />
 
       <View style={{ flex: 1, gap: 2 }}>
-        <ThemedText variant="headline">{habit.name}</ThemedText>
-        <ThemedText variant="footnote" color="secondary">
+        <ThemedText variant="headline" numberOfLines={1}>
+          {habit.name}
+        </ThemedText>
+        <ThemedText variant="footnote" color="secondary" numberOfLines={1}>
           {describeStreak(streaks)} · {describeSchedule(habit.schedule)}
         </ThemedText>
       </View>
@@ -65,6 +77,6 @@ export function HabitCard({ summary, muted = false }: HabitCardProps) {
         cellSize={5}
         gap={2}
       />
-    </PressableScale>
+    </Container>
   );
 }

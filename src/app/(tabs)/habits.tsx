@@ -6,14 +6,21 @@ import { router, useFocusEffect } from 'expo-router';
 import { useAppTheme } from '@/core/theme';
 import { strings } from '@/core/i18n';
 import { ThemedText, PressableScale, Icon, EmptyState, Enter, SectionHeader } from '@/core/ui';
-import { HabitCard } from '@/features/habits/presentation/components/habit-card';
+import {
+  HabitCard,
+  HABIT_CARD_HEIGHT,
+} from '@/features/habits/presentation/components/habit-card';
+import { DraggableHabitList } from '@/features/habits/presentation/components/draggable-habit-list';
 import { useHabitsStore } from '@/features/habits/presentation/store';
+
+const CARD_GAP = 8;
 
 export default function HabitsScreen() {
   const theme = useAppTheme();
   const habits = useHabitsStore((state) => state.habits);
   const archived = useHabitsStore((state) => state.archived);
   const loadHabits = useHabitsStore((state) => state.loadHabits);
+  const reorder = useHabitsStore((state) => state.reorder);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,13 +62,24 @@ export default function HabitsScreen() {
         {habits.length === 0 && archived.length === 0 ? (
           <EmptyState title={strings.habits.emptyTitle} message={strings.habits.emptyMessage} />
         ) : (
-          <View style={{ gap: theme.spacing.sm }}>
-            {habits.map((summary, index) => (
-              <Enter key={summary.habit.id} index={index + 1}>
-                <HabitCard summary={summary} />
-              </Enter>
-            ))}
-          </View>
+          <Enter index={1}>
+            <DraggableHabitList
+              items={habits}
+              keyExtractor={(summary) => summary.habit.id}
+              isChecked={() => false}
+              accessibilityLabelFor={(summary) => summary.habit.name}
+              onToggle={(id) => router.push(`/habit/${id}`)}
+              onReorder={reorder}
+              slot={HABIT_CARD_HEIGHT + CARD_GAP}
+              separators={false}
+              rowRole="button"
+              renderItem={(summary) => (
+                <View style={{ paddingBottom: CARD_GAP }}>
+                  <HabitCard summary={summary} interactive={false} />
+                </View>
+              )}
+            />
+          </Enter>
         )}
 
         {archived.length > 0 ? (
