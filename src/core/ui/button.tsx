@@ -39,7 +39,7 @@ export function Button({
   }[variant];
 
   const foreground = {
-    primary: '#FFFFFF',
+    primary: theme.colors.text.onSolid,
     secondary: theme.colors.text.primary,
     destructive: theme.colors.state.danger,
   }[variant];

@@ -83,7 +83,11 @@ Compact metric tile: optional icon, large `statValue` number, small gray label �
 
 ## HeatMap
 
-Consistency heat map. Takes an array of per-day intensities and a habit color; `rows` controls whether it renders as a compact strip (list rows) or a full grid (Habit Detail). Empty cells use `surface.elevated`. Callers supply an accessible label describing the period — color never carries meaning alone.
+Consistency heat map. Takes an array of per-day intensities and a habit color; `rows` controls whether it renders as a compact strip (list rows) or a full grid (Habit Detail). Empty cells use `surface.elevated`.
+
+`null` in the array is a **gap**, not an empty day: it renders transparent. This is what lets the year grid start on a Monday — the days before the range are padded rather than drawn as unfilled cells, so every row is a real weekday.
+
+`accessibilityLabel` is **required**, not optional. Colour never carries meaning alone (FR-10.1), and making it required is the only way a caller cannot forget.
 
 Only the **last** cell is animated: it is the only one that can change while the map is on screen, so it cross-fades when the day is marked while the other 363 stay plain views. Animating every cell would cost hundreds of animated nodes to express one transition.
 
@@ -117,6 +121,34 @@ app knows them, the actual counts (`docs/design/UX-Principles.md`, "What will ha
 ---
 
 # Feature Components
+
+## YearHeatMap (`features/habits/presentation/components/`)
+
+The 12-month grid on Habit Detail. Owns its horizontal scroll so the weekday initials stay
+pinned on the left while the months scroll past — putting the scroll outside the component
+sent the labels off-screen, since the grid auto-scrolls to today.
+
+Rows are pinned to weekdays via `buildYearStrip` (`features/habits/domain/calendar.ts`), which
+is what makes the L/M/X/J/V/S/D column and the month labels truthful. Only alternate rows are
+labelled: seven initials at a 10 px cell height reads as noise.
+
+Read-only. Editing lives in `MonthCalendar`, because a 10 px cell cannot meet the minimum
+touch target (FR-10.4) no matter how it is dressed up.
+
+## MonthCalendar (`features/habits/presentation/components/`)
+
+One month, seven columns, tappable days — the surface that satisfies FR-5.2, FR-5.3 and
+Journey 5. Chevrons step month by month; the forward chevron is disabled in the current
+month, so a future month is unreachable rather than merely empty.
+
+Three states only: done (habit colour), not done (`surface.elevated`), and future (dimmed and
+non-interactive). Days the schedule does not cover are deliberately **not** a fourth state —
+the year grid already carries the dense story, and a fourth texture in a small grid costs more
+than it explains.
+
+Cells are `flex: 1`, so their width follows the screen; `hitSlop` makes up the difference to
+`minTouchTarget` when the visual cell lands under it. Each cell announces its date and state,
+never relying on colour.
 
 ## HabitRow (`features/habits/presentation/components/`)
 

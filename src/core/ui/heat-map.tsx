@@ -12,8 +12,9 @@ import { useAppTheme } from '@/core/theme';
 import type { HabitColorToken } from '@/core/theme';
 
 type HeatMapProps = {
-  values: number[];
+  values: (number | null)[];
   color: HabitColorToken;
+  accessibilityLabel: string;
 
   rows?: number;
   cellSize?: number;
@@ -54,23 +55,44 @@ function LiveCell({ value, size, solid, empty }: CellProps) {
   );
 }
 
-export function HeatMap({ values, color, rows = 7, cellSize = 8, gap = 2 }: HeatMapProps) {
+export function HeatMap({
+  values,
+  color,
+  accessibilityLabel,
+  rows = 7,
+  cellSize = 8,
+  gap = 2,
+}: HeatMapProps) {
   const theme = useAppTheme();
   const solid = theme.colors.habit[color].solid;
   const empty = theme.colors.surface.elevated;
-  const lastIndex = values.length - 1;
+  const lastIndex = values.reduce(
+    (last, value, index) => (value === null ? last : index),
+    -1,
+  );
 
-  const columns: number[][] = [];
+  const columns: (number | null)[][] = [];
   for (let i = 0; i < values.length; i += rows) {
     columns.push(values.slice(i, i + rows));
   }
 
   return (
-    <View style={{ flexDirection: 'row', gap }} accessible accessibilityRole="image">
+    <View
+      style={{ flexDirection: 'row', gap }}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel}
+    >
       {columns.map((column, columnIndex) => (
         <View key={columnIndex} style={{ gap }}>
           {column.map((value, cellIndex) => {
             const index = columnIndex * rows + cellIndex;
+
+            if (value === null) {
+              return (
+                <View key={cellIndex} style={{ width: cellSize, height: cellSize }} />
+              );
+            }
 
             return index === lastIndex ? (
               <LiveCell key={cellIndex} value={value} size={cellSize} solid={solid} empty={empty} />

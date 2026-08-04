@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
@@ -10,7 +10,7 @@ import {
   ThemedText,
   Card,
   IconWell,
-  HeatMap,
+  SegmentedControl,
   StatCard,
   Button,
   PressableScale,
@@ -21,25 +21,23 @@ import {
 import { getUseCases } from '@/core/di';
 import { useHabitsStore } from '@/features/habits/presentation/store';
 import { describeSchedule } from '@/features/habits/presentation/format';
-import { addDays, today as todayDate } from '@/features/habits/domain/date';
+import { YearHeatMap } from '@/features/habits/presentation/components/year-heat-map';
+import { MonthCalendar } from '@/features/habits/presentation/components/month-calendar';
+import { startOfMonth } from '@/features/habits/domain/calendar';
+import { today as todayDate, type ISODate } from '@/features/habits/domain/date';
 import type { HabitDetail } from '@/features/habits/domain/use-cases/get-habit-detail';
 
 const HISTORY_DAYS = 364;
 
-function historyValues(history: string[]): number[] {
-  const completed = new Set(history);
-  const end = todayDate();
-  return Array.from({ length: HISTORY_DAYS }, (_, index) =>
-    completed.has(addDays(end, -(HISTORY_DAYS - 1 - index))) ? 1 : 0,
-  );
-}
+type HistoryView = 'year' | 'month';
 
 export default function HabitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useAppTheme();
   const [detail, setDetail] = useState<HabitDetail | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const historyScroll = useRef<ScrollView>(null);
+  const [view, setView] = useState<HistoryView>('year');
+  const [month, setMonth] = useState<ISODate>(() => startOfMonth(todayDate()));
   const toggle = useHabitsStore((state) => state.toggle);
 
   const load = useCallback(async () => {
@@ -122,6 +120,22 @@ export default function HabitDetailScreen() {
     await load();
   };
 
+  const onToggleDay = async (date: ISODate) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            history: current.history.includes(date)
+              ? current.history.filter((entry) => entry !== date)
+              : [...current.history, date],
+          }
+        : current,
+    );
+    await toggle(habit.id, date);
+    await load();
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.surface.primary }} edges={['top']}>
       {header}
@@ -167,24 +181,38 @@ export default function HabitDetailScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <ThemedText variant="headline">{strings.detail.history}</ThemedText>
             <ThemedText variant="footnote" color="secondary">
-              {strings.detail.lastTwelveMonths}
+              {view === 'year' ? strings.detail.lastTwelveMonths : ''}
             </ThemedText>
           </View>
+
+          <SegmentedControl
+            options={[
+              { value: 'year', label: strings.detail.viewYear },
+              { value: 'month', label: strings.detail.viewMonth },
+            ]}
+            value={view}
+            onChange={setView}
+            accessibilityLabel={strings.detail.history}
+          />
+
           <Card>
-            <ScrollView
-              ref={historyScroll}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              onContentSizeChange={() => historyScroll.current?.scrollToEnd({ animated: false })}
-            >
-              <HeatMap
-                values={historyValues(history)}
+            {view === 'year' ? (
+              <YearHeatMap
+                history={history}
+                end={todayDate()}
+                days={HISTORY_DAYS}
                 color={habit.color}
-                rows={7}
-                cellSize={10}
-                gap={3}
+                accessibilityLabel={strings.detail.heatMapLabel(habit.name, history.length)}
               />
-            </ScrollView>
+            ) : (
+              <MonthCalendar
+                month={month}
+                onMonthChange={setMonth}
+                history={history}
+                color={habit.color}
+                onToggleDay={onToggleDay}
+              />
+            )}
           </Card>
         </Enter>
 

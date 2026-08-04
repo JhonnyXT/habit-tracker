@@ -17,6 +17,8 @@ export const strings = {
     archivedSection: 'Archivados',
     emptyTitle: 'Aún no tienes hábitos',
     emptyMessage: 'Añade tu primer hábito para empezar.',
+    recentLabel: (name: string, done: number, days: number) =>
+      `Historial reciente de ${name}: ${done} de ${days} días completados`,
     streak: (count: number, unit: 'day' | 'week') =>
       unit === 'week'
         ? `${count} ${count === 1 ? 'semana' : 'semanas'} de racha`
@@ -29,6 +31,15 @@ export const strings = {
     last30: 'Últimos 30 días',
     history: 'Historial',
     lastTwelveMonths: 'Últimos 12 meses',
+    viewYear: 'Año',
+    viewMonth: 'Mes',
+    previousMonth: 'Mes anterior',
+    nextMonth: 'Mes siguiente',
+    heatMapLabel: (name: string, done: number) =>
+      `Historial de ${name}: ${done} ${done === 1 ? 'día completado' : 'días completados'} en los últimos 12 meses`,
+    dayDone: (date: string) => `${date}, hecho`,
+    dayNotDone: (date: string) => `${date}, sin hacer`,
+    dayFuture: (date: string) => `${date}, aún no llega`,
     markDone: 'Marcar como hecho',
     undo: 'Deshacer hoy',
     notFoundTitle: 'Hábito no encontrado',

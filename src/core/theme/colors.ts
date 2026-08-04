@@ -51,6 +51,8 @@ export const colors = {
       secondary: '#6E6E76',
 
       accent: '#8B6F3F',
+
+      onSolid: '#FFFFFF',
     },
     border: {
       default: '#E2E2E6',
@@ -79,6 +81,7 @@ export const colors = {
       primary: '#F2F2F4',
       secondary: '#9B9BA3',
       accent: '#C4A265',
+      onSolid: '#FFFFFF',
     },
     border: {
       default: '#2E2E33',

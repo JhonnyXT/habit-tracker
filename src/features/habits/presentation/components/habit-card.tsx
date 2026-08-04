@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 
 import { useAppTheme } from '@/core/theme';
+import { strings } from '@/core/i18n';
 import { ThemedText, IconWell, HeatMap, PressableScale } from '@/core/ui';
 import { describeSchedule, describeStreak } from '@/features/habits/presentation/format';
 import { addDays, today as todayDate } from '@/features/habits/domain/date';
@@ -25,6 +26,7 @@ type HabitCardProps = {
 export function HabitCard({ summary, muted = false }: HabitCardProps) {
   const theme = useAppTheme();
   const { habit, streaks, history } = summary;
+  const recent = recentValues(history, HEATMAP_DAYS);
 
   return (
     <PressableScale
@@ -52,8 +54,13 @@ export function HabitCard({ summary, muted = false }: HabitCardProps) {
       </View>
 
       <HeatMap
-        values={recentValues(history, HEATMAP_DAYS)}
+        values={recent}
         color={habit.color}
+        accessibilityLabel={strings.habits.recentLabel(
+          habit.name,
+          recent.filter(Boolean).length,
+          HEATMAP_DAYS,
+        )}
         rows={5}
         cellSize={5}
         gap={2}
