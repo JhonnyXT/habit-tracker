@@ -89,9 +89,6 @@ export const strings = {
     cancel: 'Cancelar',
     about: 'Acerca de',
     version: 'Versión',
-    buildVariant: 'Tipo de build',
-    buildVariantDev: 'Desarrollo',
-    buildVariantTest: 'Pruebas',
   },
   onboarding: {
     title: 'Constancia, sin ruido',

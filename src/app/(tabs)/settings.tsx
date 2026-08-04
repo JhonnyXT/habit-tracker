@@ -6,7 +6,7 @@ import { useFocusEffect } from 'expo-router';
 
 import { useAppTheme } from '@/core/theme';
 import { strings } from '@/core/i18n';
-import { appVariant, appVersion, isProd } from '@/core/config';
+import { appVersion } from '@/core/config';
 import { getUseCases } from '@/core/di';
 import { ThemedText, Card, SectionHeader, Divider, ListRow, Enter } from '@/core/ui';
 import { useHabitsStore } from '@/features/habits/presentation/store';
@@ -16,11 +16,6 @@ const permissionLabels: Record<NotificationPermission, string> = {
   granted: strings.settings.permissionGranted,
   denied: strings.settings.permissionDenied,
   undetermined: strings.settings.permissionNotRequested,
-};
-
-const variantLabels: Record<string, string> = {
-  dev: strings.settings.buildVariantDev,
-  test: strings.settings.buildVariantTest,
 };
 
 export default function SettingsScreen() {
@@ -146,17 +141,6 @@ export default function SettingsScreen() {
               iconColor={theme.colors.text.secondary}
               detail={appVersion}
             />
-            {!isProd && (
-              <>
-                <Divider inset={rowInset} />
-                <ListRow
-                  label={strings.settings.buildVariant}
-                  icon="info"
-                  iconColor={theme.colors.text.secondary}
-                  detail={variantLabels[appVariant]}
-                />
-              </>
-            )}
           </Card>
         </Enter>
       </ScrollView>

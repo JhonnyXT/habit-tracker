@@ -65,7 +65,7 @@ src/
 - Reminders: one per habit, persisted and scheduled as local notifications (daily, or one weekly trigger per selected weekday); permission is requested when the switch is turned on, never at launch; tapping a notification deep-links to that habit; `syncReminders` re-schedules from SQLite on every launch. The app declares `SCHEDULE_EXACT_ALARM` so `expo-notifications` takes its exact-alarm path — without it Android batches reminders and they arrive minutes late (measured: 11:54 → 11:56). See `docs/decisions/ADR-005.md`
 - Archive: archive/unarchive from the edit form; archived habits leave Today and appear muted under "Archivados" in the Habits tab, history intact (US-05)
 - Onboarding: one screen on first launch — three principles, then straight into creating the first habit. The flag lives in the `preferences` table (migration 2); routing is declarative via `Stack.Protected`, never an imperative redirect. See `docs/decisions/ADR-006.md`
-- Settings: notification permission row and "delete all data" are live; backup rows are still inert placeholders. The "Tipo de build" row appears on `dev` and `test`, hidden on `prod`
+- Settings: notification permission row and "delete all data" are live; backup rows are still inert placeholders
 - Build variants: `dev` / `test` / `prod` via `app.config.ts` + `APP_VARIANT`, installable side by side. See `docs/decisions/ADR-007.md`
 
 **Not built yet (V1 scope):**

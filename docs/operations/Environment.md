@@ -37,19 +37,16 @@ Matching `operations/Deployment.md`'s build variants. Selected with `APP_VARIANT
 - Debug tooling enabled: verbose logging (`standards/Logging.md`'s `debug` level), Metro and Fast Refresh, React DevTools.
 - TypeScript strict mode and linting still fully enforced (`standards/Coding-Standards.md`) — "development" relaxes debug tooling, never code quality bars.
 - Its SQLite database is the maintainer's working copy, safe to reset and reseed freely, including the realistic multi-year seeded datasets used in `reviews/06-Optimization.md`.
-- Settings shows a "Tipo de build" row reading "Desarrollo".
 
 ## `test` — `com.habittracker.app.test`
 
 - Release build (minified, Proguard, JS bundle embedded, no Metro) distributed by `adb install` or by handing over the APK, rather than through the public store. Debug-signed, since Play never sees it.
 - Debug-only tooling from `dev` is stripped, so `test` accurately reflects what QA (`reviews/07-QA.md`) and Principal Engineer Review (`reviews/08-Principal-Engineer-Review.md`) will actually ship.
 - Its own `applicationId` means its own app sandbox, so it starts with an empty database and QA never touches real habit history. This is the point of the variant.
-- Settings still shows the "Tipo de build" row, reading "Pruebas".
 
 ## `prod` — `com.habittracker`
 
 - The exact configuration submitted to Google Play — no debug tooling, `debug`-level logs stripped (`standards/Logging.md`), notification entitlements at their production values.
-- The "Tipo de build" row is hidden.
 
 ---
 
@@ -58,7 +55,7 @@ Matching `operations/Deployment.md`'s build variants. Selected with `APP_VARIANT
 - Build-time configuration (app identifiers, URL schemes, icons, permissions) lives in `app.config.ts`, keyed by variant and checked into version control — not manually edited per machine. `eas.json` maps the same three names onto EAS Build profiles.
 - An unrecognised `APP_VARIANT` throws at config resolution rather than defaulting, so a typo fails the build instead of producing a mislabelled binary.
 - There are no runtime environment variables pointing at different servers, since there is no server to point at (ADR-002) — this significantly reduces the surface area a typical `Environment.md` would need to cover (no secrets rotation, no per-environment API keys).
-- The variant is readable at runtime from `src/core/config/` (`appVariant`, `isDev`, `isTest`, `isProd`), which is the only supported way for application code to branch on it.
+- The variant is readable at runtime from `src/core/config/` (`appVariant`, `isDev`, `isTest`, `isProd`), which is the only supported way for application code to branch on it. It is never surfaced in the UI — which build is installed is told apart by the launcher name and icon background, not by a row in Settings (`decisions/ADR-007.md`).
 
 ---
 
