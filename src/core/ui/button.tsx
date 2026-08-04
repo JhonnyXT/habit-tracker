@@ -1,7 +1,8 @@
 import { Platform, View, type GestureResponderEvent } from 'react-native';
 
 import { useAppTheme, minTouchTarget } from '@/core/theme';
-import { Icon, type IconName } from '@/core/ui/icon';
+import { Icon } from '@/core/ui/icon';
+import type { IconName } from '@/core/ui/icons';
 import { PressableScale } from '@/core/ui/pressable-scale';
 import { ThemedText } from '@/core/ui/themed-text';
 

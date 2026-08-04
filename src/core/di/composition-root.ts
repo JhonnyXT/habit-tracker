@@ -1,6 +1,12 @@
 import { getDatabase } from '@/core/data';
 import { deleteAllDataUseCase } from '@/core/domain/delete-all-data';
 import { SqlitePreferencesRepository } from '@/core/data/sqlite-preferences-repository';
+import { ExpoBackupFileStore } from '@/core/data/expo-backup-file-store';
+import {
+  exportDataUseCase,
+  readBackupUseCase,
+  restoreBackupUseCase,
+} from '@/core/domain/backup-use-cases';
 import {
   hasSeenOnboardingUseCase,
   markOnboardingSeenUseCase,
@@ -34,6 +40,7 @@ async function build() {
   const reminders = new SqliteReminderRepository(db);
   const preferences = new SqlitePreferencesRepository(db);
   const scheduler = new ExpoNotificationScheduler();
+  const backupFiles = new ExpoBackupFileStore();
 
   return {
     createHabit: createHabitUseCase(habits),
@@ -53,6 +60,10 @@ async function build() {
     requestNotificationPermission: requestNotificationPermissionUseCase(scheduler),
 
     deleteAllData: deleteAllDataUseCase(habits, completions, reminders, scheduler),
+
+    exportData: exportDataUseCase(habits, completions, reminders, backupFiles),
+    readBackup: readBackupUseCase(backupFiles),
+    restoreBackup: restoreBackupUseCase(habits, completions, reminders, scheduler),
 
     hasSeenOnboarding: hasSeenOnboardingUseCase(preferences),
     markOnboardingSeen: markOnboardingSeenUseCase(preferences),

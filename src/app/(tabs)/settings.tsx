@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView } from 'react-native';
+import { Linking, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -8,7 +8,8 @@ import { useAppTheme } from '@/core/theme';
 import { strings } from '@/core/i18n';
 import { appVersion } from '@/core/config';
 import { getUseCases } from '@/core/di';
-import { ThemedText, Card, SectionHeader, Divider, ListRow, Enter } from '@/core/ui';
+import { ThemedText, Card, SectionHeader, Divider, ListRow, Enter, ConfirmDialog } from '@/core/ui';
+import type { BackupFile } from '@/core/domain/backup';
 import { useHabitsStore } from '@/features/habits/presentation/store';
 import type { NotificationPermission } from '@/features/reminders/domain/notification-scheduler';
 
@@ -18,10 +19,18 @@ const permissionLabels: Record<NotificationPermission, string> = {
   undetermined: strings.settings.permissionNotRequested,
 };
 
+type Dialog =
+  | { kind: 'none' }
+  | { kind: 'deleteAll' }
+  | { kind: 'restore'; file: BackupFile }
+  | { kind: 'notice'; title: string; message: string };
+
 export default function SettingsScreen() {
   const theme = useAppTheme();
   const rowInset = theme.spacing.md * 2 + 30;
   const [permission, setPermission] = useState<NotificationPermission>('undetermined');
+  const [dialog, setDialog] = useState<Dialog>({ kind: 'none' });
+  const [busy, setBusy] = useState(false);
   const loadToday = useHabitsStore((state) => state.loadToday);
   const loadHabits = useHabitsStore((state) => state.loadHabits);
 
@@ -33,20 +42,61 @@ export default function SettingsScreen() {
     }, []),
   );
 
-  const onDeleteAll = () => {
-    Alert.alert(strings.settings.deleteAllTitle, strings.settings.deleteAllMessage, [
-      { text: strings.settings.cancel, style: 'cancel' },
-      {
-        text: strings.settings.deleteAllConfirm,
-        style: 'destructive',
-        onPress: async () => {
-          const useCases = await getUseCases();
-          await useCases.deleteAllData();
-          await Promise.all([loadToday(), loadHabits()]);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        },
-      },
-    ]);
+  const closeDialog = () => setDialog({ kind: 'none' });
+
+  const notice = (title: string, message: string) => setDialog({ kind: 'notice', title, message });
+
+  const onDeleteAll = async () => {
+    closeDialog();
+    const useCases = await getUseCases();
+    await useCases.deleteAllData();
+    await Promise.all([loadToday(), loadHabits()]);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const onExport = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const useCases = await getUseCases();
+      const result = await useCases.exportData();
+      if (result.status === 'empty') {
+        notice(strings.settings.exportEmptyTitle, strings.settings.exportEmptyMessage);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPickBackup = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const useCases = await getUseCases();
+      const result = await useCases.readBackup();
+
+      if (result.status === 'invalid') {
+        notice(strings.settings.restoreFailedTitle, strings.settings.restoreFailed[result.code]);
+        return;
+      }
+
+      if (result.status === 'valid') setDialog({ kind: 'restore', file: result.file });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRestore = async (file: BackupFile) => {
+    closeDialog();
+    const useCases = await getUseCases();
+    await useCases.restoreBackup(file);
+    await useCases.syncReminders();
+    await Promise.all([loadToday(), loadHabits()]);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    notice(
+      strings.settings.restoreDoneTitle,
+      strings.settings.restoreDoneMessage(file.habits.length),
+    );
   };
 
   const onPressPermission = async () => {
@@ -99,6 +149,7 @@ export default function SettingsScreen() {
               label={strings.settings.exportBackup}
               icon="export"
               iconColor={theme.colors.accent.default}
+              onPress={onExport}
               showChevron
             />
             <Divider inset={rowInset} />
@@ -106,6 +157,7 @@ export default function SettingsScreen() {
               label={strings.settings.restoreBackup}
               icon="restore"
               iconColor={theme.colors.habit.orange.solid}
+              onPress={onPickBackup}
               showChevron
             />
           </Card>
@@ -126,7 +178,7 @@ export default function SettingsScreen() {
               icon="trash"
               iconColor={theme.colors.state.danger}
               destructive
-              onPress={onDeleteAll}
+              onPress={() => setDialog({ kind: 'deleteAll' })}
               showChevron
             />
           </Card>
@@ -144,6 +196,50 @@ export default function SettingsScreen() {
           </Card>
         </Enter>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={dialog.kind === 'deleteAll'}
+        title={strings.settings.deleteAllTitle}
+        message={strings.settings.deleteAllMessage}
+        confirmLabel={strings.settings.deleteAllConfirm}
+        cancelLabel={strings.settings.cancel}
+        icon="trash"
+        iconColor="red"
+        destructive
+        onConfirm={onDeleteAll}
+        onDismiss={closeDialog}
+      />
+
+      <ConfirmDialog
+        visible={dialog.kind === 'restore'}
+        title={strings.settings.restoreTitle}
+        message={
+          dialog.kind === 'restore'
+            ? strings.settings.restoreMessage(
+                dialog.file.habits.length,
+                dialog.file.completions.length,
+              )
+            : ''
+        }
+        confirmLabel={strings.settings.restoreConfirm}
+        cancelLabel={strings.settings.cancel}
+        icon="restore"
+        iconColor="orange"
+        destructive
+        onConfirm={() => {
+          if (dialog.kind === 'restore') onRestore(dialog.file);
+        }}
+        onDismiss={closeDialog}
+      />
+
+      <ConfirmDialog
+        visible={dialog.kind === 'notice'}
+        title={dialog.kind === 'notice' ? dialog.title : ''}
+        message={dialog.kind === 'notice' ? dialog.message : ''}
+        confirmLabel={strings.settings.close}
+        onConfirm={closeDialog}
+        onDismiss={closeDialog}
+      />
     </SafeAreaView>
   );
 }

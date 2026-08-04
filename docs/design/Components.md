@@ -99,6 +99,21 @@ iOS-style segmented control with a sliding selection pill animated via `spring.s
 
 Calm, minimal title + supporting copy. Never uses guilt-based or motivational-poster language.
 
+## ConfirmDialog
+
+The app's only confirmation surface, replacing the platform `Alert`. A centred card over a
+`surface.scrim`, entering with `spring.sheet` on scale and opacity only. Optional `IconWell`,
+title, message, a confirm `Button` (`destructive` for anything irreversible) and a quiet
+cancel below it.
+
+Omitting `cancelLabel` turns it into a single-button notice — the same component reports the
+result of a restore or the reason a backup file was rejected, so success and failure never
+arrive through two different visual languages.
+
+Used for every irreversible action: deleting a habit, deleting all data, and replacing the
+database from a backup. The message states the consequence in plain language and, where the
+app knows them, the actual counts (`docs/design/UX-Principles.md`, "What will happen next?").
+
 ---
 
 # Feature Components

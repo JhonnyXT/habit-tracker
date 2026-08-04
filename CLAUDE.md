@@ -34,7 +34,8 @@ src/
     theme/                design tokens (colors, typography, spacing, motion)
     ui/                   design-system primitives
     i18n/                 all user-facing strings
-    data/                 SQLite connection + migrations
+    domain/               cross-feature use cases + ports (backup, delete-all, onboarding)
+    data/                 SQLite connection + migrations + platform adapters
     di/                   composition root
   features/habits/
     domain/               entities, use cases, repository interfaces (pure TS)
@@ -65,12 +66,13 @@ src/
 - Reminders: one per habit, persisted and scheduled as local notifications (daily, or one weekly trigger per selected weekday); permission is requested when the switch is turned on, never at launch; tapping a notification deep-links to that habit; `syncReminders` re-schedules from SQLite on every launch. The app declares `SCHEDULE_EXACT_ALARM` so `expo-notifications` takes its exact-alarm path — without it Android batches reminders and they arrive minutes late (measured: 11:54 → 11:56). See `docs/decisions/ADR-005.md`
 - Archive: archive/unarchive from the edit form; archived habits leave Today and appear muted under "Archivados" in the Habits tab, history intact (US-05)
 - Onboarding: one screen on first launch — three principles, then straight into creating the first habit. The flag lives in the `preferences` table (migration 2); routing is declarative via `Stack.Protected`, never an imperative redirect. See `docs/decisions/ADR-006.md`
-- Settings: notification permission row and "delete all data" are live; backup rows are still inert placeholders
+- Settings: notification permission, "delete all data", and both backup rows are live
+- Export / import (FR-9): export serializes the domain entities to `habit-tracker-YYYY-MM-DD.json` in the cache dir and opens the OS share sheet; import picks a file, validates it **completely before any write** (`parseBackup` in `src/core/domain/backup.ts`), then **replaces** all content and re-schedules reminders. Streaks are never exported — they recompute from the restored history. `backup.test.ts` covers the round trip and every rejection path
+- Confirmations use `ConfirmDialog` (`src/core/ui/`), never the platform `Alert`. Omit `cancelLabel` for a single-button notice
 - Build variants: `dev` / `test` / `prod` via `app.config.ts` + `APP_VARIANT`, installable side by side. See `docs/decisions/ADR-007.md`
 
 **Not built yet (V1 scope):**
 - Home screen widget (FR-7)
-- Export / import (FR-9) — needs `expo-file-system`/`expo-sharing`/`expo-document-picker`, so it also needs a native rebuild
 
 ---
 

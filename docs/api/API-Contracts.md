@@ -66,9 +66,25 @@ syncReminders(): Promise<void>              // re-schedules every enabled remind
 getNotificationPermission(): Promise<NotificationPermission>
 requestNotificationPermission(): Promise<NotificationPermission>
 
-exportData(): Promise<ExportFile>          // shape defined in api/Data-Models.md
-importData(file: ExportFile): Promise<void> // validates fully before writing (FR-9.2)
+exportData(): Promise<
+  | { status: 'shared' }                    // written to cache, OS share sheet opened
+  | { status: 'cancelled' }                 // sharing unavailable on this device
+  | { status: 'empty' }                     // nothing to export yet
+>
+readBackup(): Promise<                      // picks a file and validates it; writes nothing
+  | { status: 'cancelled' }
+  | { status: 'invalid'; code: BackupErrorCode }
+  | { status: 'valid'; file: BackupFile }   // shape defined in api/Data-Models.md
+>
+restoreBackup(file: BackupFile): Promise<void>  // replaces all content; only ever called
+                                                // with a file readBackup already validated
 ```
+
+Export/import is split into `readBackup` and `restoreBackup` rather than a single
+`importData`, because FR-9.2 requires validating before any write **and** the user has to
+confirm a replacement they can't undo. Splitting the two makes it impossible to write to
+the database on a path that skipped validation: `restoreBackup` only accepts a
+`BackupFile`, which is the parse result and cannot be constructed from unvalidated input.
 
 - Every use case returns Domain entities (`api/Data-Models.md`), never raw database rows.
 - `toggleCompletion` rejects (or is disallowed by the caller from being invoked with) any `date` later than today, per FR-2.3 — enforced inside the use case, not left to the caller to remember.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Platform, ScrollView, TextInput, Switch, View } from 'react-native';
+import { Linking, Platform, ScrollView, TextInput, Switch, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,6 +18,7 @@ import {
   SegmentedControl,
   CompletionCheck,
   Enter,
+  ConfirmDialog,
   type IconName,
 } from '@/core/ui';
 import { getUseCases } from '@/core/di';
@@ -72,6 +73,7 @@ export default function HabitFormScreen() {
   const remove = useHabitsStore((state) => state.remove);
   const archive = useHabitsStore((state) => state.archive);
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState<IconName>('running');
   const [color, setColor] = useState<HabitColorToken>('blue');
@@ -181,18 +183,10 @@ export default function HabitFormScreen() {
     router.back();
   };
 
-  const onDelete = () => {
-    Alert.alert(strings.form.deleteTitle, strings.form.deleteMessage, [
-      { text: strings.form.cancel, style: 'cancel' },
-      {
-        text: strings.form.deleteConfirm,
-        style: 'destructive',
-        onPress: async () => {
-          await remove(id!);
-          router.dismissAll();
-        },
-      },
-    ]);
+  const onDelete = async () => {
+    setConfirmingDelete(false);
+    await remove(id!);
+    router.dismissAll();
   };
 
   if (!loaded) {
@@ -585,7 +579,7 @@ export default function HabitFormScreen() {
               label={strings.form.delete}
               variant="destructive"
               icon="trash"
-              onPress={onDelete}
+              onPress={() => setConfirmingDelete(true)}
             />
           </Enter>
         ) : null}
@@ -614,6 +608,19 @@ export default function HabitFormScreen() {
           accessibilityLabel={strings.a11y.saveHabit}
         />
       </View>
+
+      <ConfirmDialog
+        visible={confirmingDelete}
+        title={strings.form.deleteTitle}
+        message={strings.form.deleteMessage}
+        confirmLabel={strings.form.deleteConfirm}
+        cancelLabel={strings.form.cancel}
+        icon="trash"
+        iconColor="red"
+        destructive
+        onConfirm={onDelete}
+        onDismiss={() => setConfirmingDelete(false)}
+      />
     </SafeAreaView>
   );
 }

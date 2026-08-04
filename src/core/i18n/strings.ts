@@ -87,6 +87,35 @@ export const strings = {
       'Esto borra permanentemente todos tus hábitos, su historial y sus recordatorios. No se puede deshacer.',
     deleteAllConfirm: 'Eliminar todo',
     cancel: 'Cancelar',
+    close: 'Entendido',
+
+    exportEmptyTitle: 'No hay nada que exportar',
+    exportEmptyMessage: 'Crea tu primer hábito y vuelve cuando tengas algo que guardar.',
+
+    restoreTitle: '¿Reemplazar tus datos?',
+    restoreMessage: (habits: number, completions: number) =>
+      `Esta copia trae ${habits} ${habits === 1 ? 'hábito' : 'hábitos'} y ${completions} ${
+        completions === 1 ? 'registro' : 'registros'
+      }. Sustituirá todo lo que tienes ahora, y eso no se puede deshacer.`,
+    restoreConfirm: 'Reemplazar',
+    restoreDoneTitle: 'Copia restaurada',
+    restoreDoneMessage: (habits: number) =>
+      `Se ${habits === 1 ? 'restauró' : 'restauraron'} ${habits} ${
+        habits === 1 ? 'hábito' : 'hábitos'
+      } con todo su historial.`,
+
+    restoreFailedTitle: 'No se pudo leer la copia',
+    restoreFailed: {
+      notJson: 'El archivo no es un JSON válido. Elige el archivo que exportó esta app.',
+      notAnObject: 'El archivo no tiene la estructura de una copia de Habit Tracker.',
+      unsupportedVersion:
+        'La copia se creó con una versión del formato que esta app no entiende. Actualiza la app e inténtalo de nuevo.',
+      missingArrays: 'A la copia le faltan datos: debe incluir hábitos, registros y recordatorios.',
+      malformedHabit: 'Uno de los hábitos de la copia tiene datos que esta app no reconoce.',
+      malformedCompletion: 'Uno de los registros de la copia tiene una fecha inválida.',
+      malformedReminder: 'Uno de los recordatorios de la copia tiene una hora inválida.',
+      orphanRecord: 'La copia tiene registros que apuntan a un hábito que no contiene.',
+    },
     about: 'Acerca de',
     version: 'Versión',
   },

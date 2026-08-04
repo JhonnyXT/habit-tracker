@@ -4,7 +4,8 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/core/theme';
-import { Icon, type IconName } from '@/core/ui/icon';
+import { Icon } from '@/core/ui/icon';
+import type { IconName } from '@/core/ui/icons';
 import { PressableScale } from '@/core/ui/pressable-scale';
 import { ThemedText } from '@/core/ui/themed-text';
 

@@ -43,6 +43,8 @@ export const colors = {
       secondary: '#FFFFFF',
 
       elevated: '#EFEFF1',
+
+      scrim: 'rgba(0, 0, 0, 0.4)',
     },
     text: {
       primary: '#111113',
@@ -70,6 +72,8 @@ export const colors = {
       primary: '#000000',
       secondary: '#1C1C1F',
       elevated: '#2A2A2E',
+
+      scrim: 'rgba(0, 0, 0, 0.6)',
     },
     text: {
       primary: '#F2F2F4',
