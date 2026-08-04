@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/core/theme';
 import { strings } from '@/core/i18n';
-import { ThemedText, PressableScale, Icon, EmptyState, Enter } from '@/core/ui';
+import { ThemedText, PressableScale, Icon, EmptyState, Enter, ConfirmDialog } from '@/core/ui';
 import { DailyGoal } from '@/features/habits/presentation/components/daily-goal';
 import { HabitRow } from '@/features/habits/presentation/components/habit-row';
 import { DraggableHabitList } from '@/features/habits/presentation/components/draggable-habit-list';
@@ -32,6 +32,8 @@ export default function TodayScreen() {
   const loadToday = useHabitsStore((state) => state.loadToday);
   const toggle = useHabitsStore((state) => state.toggle);
   const reorder = useHabitsStore((state) => state.reorder);
+  const remove = useHabitsStore((state) => state.remove);
+  const [pendingDelete, setPendingDelete] = useState<TodayHabit | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,6 +101,7 @@ export default function TodayScreen() {
               style={{
                 backgroundColor: theme.colors.surface.secondary,
                 borderRadius: theme.radius.lg,
+                overflow: 'hidden',
               }}
             >
               <DraggableHabitList
@@ -108,6 +111,10 @@ export default function TodayScreen() {
                 accessibilityLabelFor={(entry) => `${entry.habit.name}, ${subtitleFor(entry)}`}
                 onToggle={onToggle}
                 onReorder={reorder}
+                onEdit={(id) => router.push(`/habit-form?id=${id}`)}
+                onDelete={(id) =>
+                  setPendingDelete(today.find((entry) => entry.habit.id === id) ?? null)
+                }
                 renderItem={(entry) => (
                   <HabitRow
                     habit={entry.habit}
@@ -120,6 +127,25 @@ export default function TodayScreen() {
           </>
         )}
       </ScrollView>
+
+      <ConfirmDialog
+        visible={pendingDelete !== null}
+        title={strings.today.deleteTitle(pendingDelete?.habit.name ?? '')}
+        message={strings.today.deleteMessage}
+        confirmLabel={strings.today.deleteConfirm}
+        cancelLabel={strings.today.cancel}
+        icon="trash"
+        iconColor="red"
+        destructive
+        onConfirm={async () => {
+          const target = pendingDelete;
+          setPendingDelete(null);
+          if (!target) return;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          await remove(target.habit.id);
+        }}
+        onDismiss={() => setPendingDelete(null)}
+      />
     </SafeAreaView>
   );
 }

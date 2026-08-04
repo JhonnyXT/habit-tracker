@@ -7,19 +7,19 @@ const variants = {
     name: 'Habit Tracker (Dev)',
     package: 'com.habittracker.app',
     scheme: 'habittracker',
-    iconBackground: '#E6F4FE',
+    iconBackground: '#F5EFE9',
   },
   test: {
     name: 'Habit Tracker (Test)',
     package: 'com.habittracker.app.test',
     scheme: 'habittracker-test',
-    iconBackground: '#FFE0B2',
+    iconBackground: '#F7E4C8',
   },
   prod: {
     name: 'Habit Tracker',
     package: 'com.habittracker',
     scheme: 'habittracker-prod',
-    iconBackground: '#DDE3EA',
+    iconBackground: '#FDEDE5',
   },
 } as const satisfies Record<Variant, unknown>;
 
@@ -40,14 +40,10 @@ const config: ExpoConfig = {
   icon: './assets/images/icon.png',
   scheme: current.scheme,
   userInterfaceStyle: 'automatic',
-  ios: {
-    icon: './assets/expo.icon',
-  },
   android: {
     adaptiveIcon: {
       backgroundColor: current.iconBackground,
       foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: true,
@@ -63,13 +59,19 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#208AEF',
+        backgroundColor: current.iconBackground,
         image: './assets/images/splash-icon.png',
-        imageWidth: 76,
+        imageWidth: 96,
       },
     ],
     'expo-sqlite',
-    'expo-notifications',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/images/notification-icon.png',
+        color: '#E85D26',
+      },
+    ],
     '@react-native-community/datetimepicker',
   ],
   experiments: {

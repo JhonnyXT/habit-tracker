@@ -9,8 +9,16 @@ export const strings = {
     dailyGoal: 'Meta diaria',
     doneCount: (done: number, total: number) => `${done} de ${total} hecho`,
     allDone: 'Día completo',
+    allDoneMessage: (total: number) =>
+      total === 1 ? 'Tu hábito de hoy, hecho.' : `Los ${total} hábitos de hoy, hechos.`,
     emptyTitle: 'Nada pendiente hoy',
     emptyMessage: 'Añade un hábito para empezar, o disfruta el día libre.',
+    swipeEdit: 'Editar',
+    swipeDelete: 'Eliminar',
+    deleteTitle: (name: string) => `¿Eliminar ${name}?`,
+    deleteMessage: 'Se borra el hábito y todo su historial. No se puede deshacer.',
+    deleteConfirm: 'Eliminar',
+    cancel: 'Cancelar',
   },
   habits: {
     title: 'Hábitos',

@@ -59,7 +59,8 @@ src/
 ## Current state
 
 **Working end to end (persisted in SQLite):**
-- Today: habit list, tap to toggle (strikethrough + check), long-press drag to reorder, progress bar
+- Today: habit list, tap to toggle (strikethrough + check), long-press drag to reorder, progress bar. **Swipe a row** right for Editar, left for Eliminar (which confirms via `ConfirmDialog` — deleting destroys the whole history). Only one row opens at a time. The three gestures compose as `Gesture.Race(swipe, Gesture.Exclusive(drag, tap))`, with the swipe declaring `activeOffsetX`/`failOffsetY` so vertical scrolling and the long-press drag still win
+- Completing every habit transforms the `DailyGoal` card in place — progress cross-fades out, flame and message spring in. The card has a fixed content height so the swap never animates height
 - Habits: list with heat maps, navigation to detail
 - Habit Detail: streaks, plus a Historial card with an **Año | Mes** switch. Año is the 12-month grid, now pinned to weekdays with day initials and month labels; Mes is a real month calendar where **tapping any past day marks or unmarks it** (Journey 5, FR-5.2/5.3). Future days are dimmed and inert, and the forward chevron is disabled in the current month. The date maths lives in `src/features/habits/domain/calendar.ts` and is unit-tested
 - Add/Edit Habit: live preview, icon/color/schedule pickers, real time picker, delete
@@ -144,7 +145,7 @@ The app follows Apple's fluid-interface principles (the `apple-design` skill). C
 - **Animate `transform` and `opacity` only.** A width/height/margin animation is a bug — `ProgressBar` uses `scaleX` with `transformOrigin: 'left'`, `ColorSwatch` uses `scale`.
 - **Never call a plain function inside a worklet.** `useAnimatedStyle` runs on the UI thread; calling a normal helper from it throws `[Worklets] Tried to synchronously call a non-worklet function` at runtime and shows a red screen — with `tsc` and eslint both green. Compute the value on the JS side and let the worklet capture it.
 - **Entrance animations use `<Enter>`**, which animates on a screen's **first** focus and renders instantly on every focus after that. Reanimated's `entering` prop only runs on mount, which would skip the animation entirely for a lazily-mounted tab; replaying it on *every* focus was worse — a stagger you see dozens of times a day stops being an entrance and becomes a delay.
-- Accent is flame orange — the streak metaphor, and the only warm saturated colour in a neutral palette.
+- Accent is flame orange — the streak metaphor, and the only warm saturated colour in a neutral palette. The app icon is the same flame; sources live in `assets/brand/` and everything in `assets/images/` is generated from them, never hand-edited. The notification icon is a **second, simpler flame**, because Android flattens it to a 24 dp white silhouette and the launcher mark is illegible at that size (`docs/assets/Brand-Guidelines.md`).
 
 ---
 

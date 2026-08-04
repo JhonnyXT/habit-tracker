@@ -61,6 +61,32 @@ And explicitly avoid:
 - Full specification lives in `assets/Icons.md` (distinct from `design/Icons.md`'s in-app iconography system).
 - The app icon should read clearly at the smallest home-screen size, use the product's core palette restrained to a very small number of colors, and avoid literal, cluttered illustration in favor of a simple, memorable mark.
 
+## The mark
+
+A flame in `accent.default` (`#E85D26`). It is not decoration: `design/Colors.md` records that
+the accent was changed from blue to flame orange so the palette would carry the streak
+metaphor the product is built around, and the same flame is already the Today tab and the
+streak statistic. The icon says what the app is about with the shape it already uses inside.
+
+## Source files
+
+Both live in `assets/brand/` and are **the source of truth**; everything in `assets/images/`
+is generated from them and should never be edited by hand.
+
+| File | Used for |
+|---|---|
+| `flame.svg` | Launcher icon, adaptive foreground, monochrome layer, splash |
+| `flame-glyph.svg` | Notification icon only — a simplified flame that survives 24 px (see `engineering/Notifications.md`) |
+
+Two marks exist because one shape cannot do both jobs: the launcher renders at 48–192 dp and
+can carry detail, while the status bar flattens to a white silhouette at 24 dp and cannot.
+
+## Adaptive icon
+
+The foreground sits inside Android's guaranteed 66% safe circle; the background is a flat
+warm colour that differs per build variant (`decisions/ADR-007.md`), so the three installs are
+distinguishable in the launcher at a glance without shipping three sets of artwork.
+
 ---
 
 # Store Presence

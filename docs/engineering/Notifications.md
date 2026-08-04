@@ -60,6 +60,23 @@ Per `02-Architecture.md`, notification scheduling is a **Platform layer** concer
 
 - Copy references the specific habit by name (per `design/UX-Principles.md`'s Calm Notifications principle) — never generic urgency language.
 - No notification is ever sent that the user did not explicitly configure — no re-engagement, no "you're falling behind" messaging invented by the product.
+- Title is the habit's name; body is a single calm line; the channel is silent (`sound: null`) and carries no badge. A reminder should be noticed, not obeyed.
+
+---
+
+# Notification Icon
+
+Android draws the status-bar icon from the **alpha channel only** — colour is discarded and
+the shape is filled white. The `expo-notifications` plugin emits the `notification_icon`
+drawable and its manifest meta-data **only when passed an `icon` option**; without it Android
+falls back to the launcher icon, and since that is opaque the status bar shows a white square.
+
+So the plugin is configured with an explicit icon and the accent colour, and that icon is a
+**separate, simplified glyph** (`assets/brand/flame-glyph.svg`), not the launcher mark. The
+launcher flame was measured as illegible at 24 px once flattened to a silhouette: its shape
+is carried by negative space that closes up at that size. The glyph is drawn with a single
+`fill-rule="evenodd"` path so its inner cut is a real hole rather than white paint, which is
+the only way detail survives the alpha flattening.
 
 ---
 

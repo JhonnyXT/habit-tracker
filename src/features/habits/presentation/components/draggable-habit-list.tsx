@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedReaction,
   withSpring,
+  withTiming,
   runOnJS,
   useReducedMotion,
   type SharedValue,
@@ -14,6 +15,8 @@ import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/core/theme';
 import { spring as springTokens, pressScale } from '@/core/theme/motion';
+import { strings } from '@/core/i18n';
+import { Icon } from '@/core/ui';
 import {
   HABIT_ROW_HEIGHT,
   HABIT_ROW_SEPARATOR_INSET,
@@ -23,6 +26,9 @@ const SLOT = HABIT_ROW_HEIGHT;
 const LONG_PRESS_MS = 220;
 const LIFT_SCALE = 1.03;
 const LIFT_ELEVATION = 12;
+const ACTION_WIDTH = 84;
+const OPEN_THRESHOLD = ACTION_WIDTH / 2;
+const FLING_VELOCITY = 500;
 
 type Positions = Record<string, number>;
 
@@ -49,8 +55,11 @@ type DraggableRowProps = {
   index: number;
   positions: SharedValue<Positions>;
   count: number;
+  openId: SharedValue<string | null>;
   onTap: () => void;
   onCommit: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
   accessibilityLabel: string;
   checked: boolean;
   children: React.ReactNode;
@@ -61,8 +70,11 @@ function DraggableRow({
   index,
   positions,
   count,
+  openId,
   onTap,
   onCommit,
+  onEdit,
+  onDelete,
   accessibilityLabel,
   checked,
   children,
@@ -74,6 +86,27 @@ function DraggableRow({
   const startTop = useSharedValue(0);
   const isActive = useSharedValue(false);
   const isPressed = useSharedValue(false);
+  const offsetX = useSharedValue(0);
+  const startX = useSharedValue(0);
+
+  const settle = (to: number) => {
+    'worklet';
+    offsetX.value = reducedMotion
+      ? withTiming(to, { duration: 120 })
+      : withSpring(to, springTokens.snappy);
+    openId.value = to === 0 ? null : id;
+  };
+
+  useAnimatedReaction(
+    () => openId.value,
+    (current) => {
+      if (current !== id && offsetX.value !== 0) {
+        offsetX.value = reducedMotion
+          ? withTiming(0, { duration: 120 })
+          : withSpring(0, springTokens.snappy);
+      }
+    },
+  );
 
   useAnimatedReaction(
     () => positions.value[id],
@@ -129,10 +162,39 @@ function DraggableRow({
   const tap = Gesture.Tap()
     .maxDuration(LONG_PRESS_MS)
     .onEnd((_event, success) => {
-      if (success) runOnJS(onTap)();
+      if (!success) return;
+      if (offsetX.value !== 0) {
+        settle(0);
+        return;
+      }
+      runOnJS(onTap)();
     });
 
-  const gesture = Gesture.Exclusive(drag, tap);
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-12, 12])
+    .onStart(() => {
+      startX.value = offsetX.value;
+    })
+    .onUpdate((event) => {
+      const next = startX.value + event.translationX;
+      offsetX.value = clamp(next, -ACTION_WIDTH, ACTION_WIDTH);
+    })
+    .onEnd((event) => {
+      const projected = offsetX.value + event.velocityX * 0.05;
+
+      if (projected <= -OPEN_THRESHOLD || event.velocityX < -FLING_VELOCITY) {
+        settle(-ACTION_WIDTH);
+        runOnJS(tick)();
+      } else if (projected >= OPEN_THRESHOLD || event.velocityX > FLING_VELOCITY) {
+        settle(ACTION_WIDTH);
+        runOnJS(tick)();
+      } else {
+        settle(0);
+      }
+    });
+
+  const gesture = Gesture.Race(swipe, Gesture.Exclusive(drag, tap));
 
   const style = useAnimatedStyle(() => {
     const lift = isActive.value ? 1 : 0;
@@ -158,21 +220,88 @@ function DraggableRow({
     };
   });
 
+  const slideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: offsetX.value }],
+    backgroundColor: theme.colors.surface.secondary,
+  }));
+
+  const editStyle = useAnimatedStyle(() => {
+    const progress = clamp(offsetX.value / ACTION_WIDTH, 0, 1);
+    return { opacity: progress, transform: [{ scale: 0.7 + progress * 0.3 }] };
+  });
+
+  const deleteStyle = useAnimatedStyle(() => {
+    const progress = clamp(-offsetX.value / ACTION_WIDTH, 0, 1);
+    return { opacity: progress, transform: [{ scale: 0.7 + progress * 0.3 }] };
+  });
+
   return (
     <GestureDetector gesture={gesture}>
-      <Animated.View
-        accessible
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked }}
-        accessibilityLabel={accessibilityLabel}
-        accessibilityHint={
-          checked
-            ? 'Double tap to mark as not done. Touch and hold to reorder.'
-            : 'Double tap to mark as done. Touch and hold to reorder.'
-        }
-        style={style}
-      >
-        {children}
+      <Animated.View style={style}>
+        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+          <Pressable
+            onPress={onEdit}
+            accessibilityRole="button"
+            accessibilityLabel={`${strings.today.swipeEdit} ${accessibilityLabel}`}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: ACTION_WIDTH,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: theme.colors.surface.elevated,
+            }}
+          >
+            <Animated.View style={editStyle}>
+              <Icon name="edit" size={20} color={theme.colors.text.primary} />
+            </Animated.View>
+          </Pressable>
+
+          <Pressable
+            onPress={onDelete}
+            accessibilityRole="button"
+            accessibilityLabel={`${strings.today.swipeDelete} ${accessibilityLabel}`}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: ACTION_WIDTH,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: theme.colors.state.danger,
+            }}
+          >
+            <Animated.View style={deleteStyle}>
+              <Icon name="trash" size={20} color={theme.colors.text.onSolid} />
+            </Animated.View>
+          </Pressable>
+        </View>
+
+        <Animated.View
+          accessible
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked }}
+          accessibilityLabel={accessibilityLabel}
+          accessibilityHint={
+            checked
+              ? 'Double tap to mark as not done. Touch and hold to reorder.'
+              : 'Double tap to mark as done. Touch and hold to reorder.'
+          }
+          accessibilityActions={[
+            { name: 'edit', label: strings.today.swipeEdit },
+            { name: 'delete', label: strings.today.swipeDelete },
+          ]}
+          onAccessibilityAction={(event) => {
+            if (event.nativeEvent.actionName === 'edit') onEdit();
+            if (event.nativeEvent.actionName === 'delete') onDelete();
+          }}
+          style={slideStyle}
+        >
+          {children}
+        </Animated.View>
       </Animated.View>
     </GestureDetector>
   );
@@ -187,6 +316,8 @@ type DraggableHabitListProps<T> = {
   isChecked: (item: T) => boolean;
   onToggle: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
 };
 
 export function DraggableHabitList<T>({
@@ -197,9 +328,12 @@ export function DraggableHabitList<T>({
   isChecked,
   onToggle,
   onReorder,
+  onEdit,
+  onDelete,
 }: DraggableHabitListProps<T>) {
   const ids = useMemo(() => items.map(keyExtractor), [items, keyExtractor]);
   const positions = useSharedValue<Positions>({});
+  const openId = useSharedValue<string | null>(null);
 
   const idKey = ids.join('|');
   useEffect(() => {
@@ -231,8 +365,11 @@ export function DraggableHabitList<T>({
             index={index}
             positions={positions}
             count={items.length}
+            openId={openId}
             onTap={() => onToggle(id)}
             onCommit={commit}
+            onEdit={() => onEdit(id)}
+            onDelete={() => onDelete(id)}
             accessibilityLabel={accessibilityLabelFor(item)}
             checked={isChecked(item)}
           >
