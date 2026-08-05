@@ -11,8 +11,9 @@ import Animated, {
 
 import { useAppTheme } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
-import { ThemedText, IconWell, CompletionCheck, ICON_WELL_SIZE } from '@/core/ui';
+import { ThemedText, IconWell, CompletionCheck, ProgressBar, ICON_WELL_SIZE } from '@/core/ui';
 import type { Habit } from '@/features/habits/domain/entities/habit';
+import type { TaskProgress } from '@/features/habits/domain/task-progress';
 
 export const HABIT_ROW_HEIGHT = 72;
 export const HABIT_ROW_SEPARATOR_INSET = spacing.md * 2 + ICON_WELL_SIZE;
@@ -21,9 +22,10 @@ type HabitRowProps = {
   habit: Habit;
   subtitle: string;
   completed: boolean;
+  taskProgress?: TaskProgress | null;
 };
 
-export function HabitRow({ habit, subtitle, completed }: HabitRowProps) {
+export function HabitRow({ habit, subtitle, completed, taskProgress }: HabitRowProps) {
   const theme = useAppTheme();
   const reducedMotion = useReducedMotion();
   const progress = useSharedValue(completed ? 1 : 0);
@@ -91,6 +93,12 @@ export function HabitRow({ habit, subtitle, completed }: HabitRowProps) {
             {subtitle}
           </ThemedText>
         </Animated.View>
+
+        {taskProgress && taskProgress.totalCount > 0 ? (
+          <View style={{ marginTop: 2, marginRight: theme.spacing.lg }}>
+            <ProgressBar value={taskProgress.completedCount / taskProgress.totalCount} height={3} />
+          </View>
+        ) : null}
       </View>
 
       <CompletionCheck completed={completed} color={habit.color} />

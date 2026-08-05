@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 
 import { useAppTheme } from '@/core/theme';
 import { strings } from '@/core/i18n';
-import { ThemedText, IconWell, HeatMap, PressableScale } from '@/core/ui';
+import { ThemedText, IconWell, HeatMap, PressableScale, ProgressBar } from '@/core/ui';
 import { describeSchedule, describeStreak } from '@/features/habits/presentation/format';
 import { addDays, today as todayDate } from '@/features/habits/domain/date';
 import type { HabitSummary } from '@/features/habits/domain/use-cases/get-habits';
@@ -28,8 +28,9 @@ type HabitCardProps = {
 
 export function HabitCard({ summary, muted = false, interactive = true }: HabitCardProps) {
   const theme = useAppTheme();
-  const { habit, streaks, history } = summary;
+  const { habit, streaks, history, taskProgress } = summary;
   const recent = recentValues(history, HEATMAP_DAYS);
+  const hasTasks = Boolean(taskProgress && taskProgress.totalCount > 0);
 
   const Container = interactive ? PressableScale : View;
 
@@ -39,7 +40,11 @@ export function HabitCard({ summary, muted = false, interactive = true }: HabitC
         ? {
             onPress: () => router.push(`/habit/${habit.id}`),
             accessibilityRole: 'button' as const,
-            accessibilityLabel: `${habit.name}, ${describeStreak(streaks)}`,
+            accessibilityLabel: `${habit.name}, ${describeStreak(streaks)}${
+              hasTasks && taskProgress
+                ? strings.a11y.taskProgress(taskProgress.completedCount, taskProgress.totalCount)
+                : ''
+            }`,
             activeScale: 0.985,
           }
         : {})}
@@ -63,6 +68,11 @@ export function HabitCard({ summary, muted = false, interactive = true }: HabitC
         <ThemedText variant="footnote" color="secondary" numberOfLines={1}>
           {describeStreak(streaks)} · {describeSchedule(habit.schedule)}
         </ThemedText>
+        {hasTasks && taskProgress ? (
+          <View style={{ marginTop: 2, marginRight: theme.spacing.lg }}>
+            <ProgressBar value={taskProgress.completedCount / taskProgress.totalCount} height={3} />
+          </View>
+        ) : null}
       </View>
 
       <HeatMap

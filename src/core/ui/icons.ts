@@ -21,6 +21,9 @@ export const icons = {
   search: { sf: 'magnifyingglass', fallback: { set: 'ionicons', name: 'search' } },
   calendar: { sf: 'calendar', fallback: { set: 'ionicons', name: 'calendar' } },
   moon: { sf: 'moon.fill', fallback: { set: 'ionicons', name: 'moon' } },
+  more: { sf: 'ellipsis', fallback: { set: 'ionicons', name: 'ellipsis-horizontal' } },
+  repeat: { sf: 'repeat', fallback: { set: 'ionicons', name: 'repeat' } },
+  archive: { sf: 'archivebox.fill', fallback: { set: 'ionicons', name: 'archive' } },
 
   streak: { sf: 'flame.fill', fallback: { set: 'ionicons', name: 'flame' } },
   trophy: { sf: 'trophy.fill', fallback: { set: 'ionicons', name: 'trophy' } },

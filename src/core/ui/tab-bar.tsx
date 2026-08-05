@@ -15,9 +15,20 @@ const tabIcons: Record<string, IconName> = {
   settings: 'settings',
 };
 
+export const TAB_BAR_HEIGHT = 60;
+
+// Today has a "+" FAB floating to the right of the tab bar (see
+// (tabs)/index.tsx). Reserving this much width on that side keeps the
+// [tab bar + FAB] group centered as one unit on that screen, instead of the
+// tab bar centering itself across the full width and reading as off-center
+// once the FAB's extra footprint is added next to it.
+const FAB_RESERVED_WIDTH = 80;
+const screensWithFab = new Set(['index']);
+
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
+  const reserveForFab = screensWithFab.has(state.routeNames[state.index]);
 
   return (
     <View
@@ -25,7 +36,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       style={{
         position: 'absolute',
         left: 0,
-        right: 0,
+        right: reserveForFab ? FAB_RESERVED_WIDTH : 0,
         bottom: insets.bottom + theme.spacing.sm,
         alignItems: 'center',
       }}

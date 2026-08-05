@@ -60,7 +60,7 @@ export default function HabitsScreen() {
         </Enter>
 
         {habits.length === 0 && archived.length === 0 ? (
-          <EmptyState title={strings.habits.emptyTitle} message={strings.habits.emptyMessage} />
+          <EmptyState title={strings.habits.emptyTitle} message={strings.habits.emptyMessage} deck />
         ) : (
           <Enter index={1}>
             <DraggableHabitList
