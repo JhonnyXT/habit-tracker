@@ -134,6 +134,14 @@ export const strings = {
       malformedReminder: 'Uno de los recordatorios de la copia tiene una hora inválida.',
       orphanRecord: 'La copia tiene registros que apuntan a un hábito que no contiene.',
     },
+    appearance: 'Apariencia',
+    appearanceSystem: 'Sistema',
+    appearanceLight: 'Claro',
+    appearanceDark: 'Oscuro',
+
+    exportExcel: 'Exportar a Excel',
+    exportExcelNote: 'Una hoja de cálculo con tus hábitos, tu historial y tus recordatorios, para leer o analizar. No sirve para restaurar: usa la copia de seguridad para eso.',
+
     about: 'Acerca de',
     version: 'Versión',
   },
@@ -182,5 +190,23 @@ export const strings = {
   schedule: {
     daily: 'Todos los días',
     timesPerWeek: (count: number) => `${count}× por semana`,
+  },
+  spreadsheet: {
+    habitsSheet: 'Hábitos',
+    completionsSheet: 'Completados',
+    remindersSheet: 'Recordatorios',
+    columnName: 'Nombre',
+    columnSchedule: 'Frecuencia',
+    columnCurrentStreak: 'Racha actual',
+    columnLongestStreak: 'Mejor racha',
+    columnLast30: 'Últimos 30 días (%)',
+    columnArchived: 'Archivado',
+    columnCreatedAt: 'Creado',
+    columnHabit: 'Hábito',
+    columnDate: 'Fecha',
+    columnTime: 'Hora',
+    columnEnabled: 'Activo',
+    yes: 'Sí',
+    no: 'No',
   },
 } as const;

@@ -13,6 +13,25 @@ export type Streaks = {
   unit: 'day' | 'week';
 };
 
+export function last30Percent(
+  schedule: Schedule,
+  completionDates: readonly ISODate[],
+  today: ISODate = todayDate(),
+): number {
+  const completed = new Set(completionDates);
+
+  let scheduled = 0;
+  let done = 0;
+  for (let offset = 0; offset < 30; offset += 1) {
+    const day = addDays(today, -offset);
+    if (!isEligibleOn(schedule, day)) continue;
+    scheduled += 1;
+    if (completed.has(day)) done += 1;
+  }
+
+  return scheduled === 0 ? 0 : Math.round((done / scheduled) * 100);
+}
+
 export function computeStreaks(
   schedule: Schedule,
   completionDates: readonly ISODate[],

@@ -7,6 +7,8 @@ import {
   type BackupFile,
 } from '@/core/domain/backup';
 import type { BackupFileStore } from '@/core/domain/backup-file-store';
+import { buildSpreadsheetSheets, spreadsheetFileName } from '@/core/domain/spreadsheet';
+import type { SpreadsheetFileStore } from '@/core/domain/spreadsheet-file-store';
 import type {
   CompletionRepository,
   HabitRepository,
@@ -38,6 +40,30 @@ export function exportDataUseCase(
       backupFileName(exportedAt),
       JSON.stringify(backup, null, 2),
     );
+
+    return shared ? { status: 'shared' } : { status: 'cancelled' };
+  };
+}
+
+export function exportSpreadsheetUseCase(
+  habits: HabitRepository,
+  completions: CompletionRepository,
+  reminders: ReminderRepository,
+  files: SpreadsheetFileStore,
+) {
+  return async (): Promise<ExportResult> => {
+    const all = await habits.getAll(true);
+    if (all.length === 0) return { status: 'empty' };
+
+    const completionsByHabit = new Map<string, string[]>();
+    for (const completion of await completions.getAll()) {
+      const list = completionsByHabit.get(completion.habitId) ?? [];
+      list.push(completion.date);
+      completionsByHabit.set(completion.habitId, list);
+    }
+
+    const sheets = buildSpreadsheetSheets(all, completionsByHabit, await reminders.getAll());
+    const shared = await files.writeAndShare(spreadsheetFileName(new Date()), sheets);
 
     return shared ? { status: 'shared' } : { status: 'cancelled' };
   };

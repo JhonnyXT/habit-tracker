@@ -78,6 +78,15 @@ readBackup(): Promise<                      // picks a file and validates it; wr
 >
 restoreBackup(file: BackupFile): Promise<void>  // replaces all content; only ever called
                                                 // with a file readBackup already validated
+
+exportSpreadsheet(): Promise<
+  | { status: 'shared' }                    // .xlsx written to cache, OS share sheet opened
+  | { status: 'cancelled' }
+  | { status: 'empty' }
+>                                             // read-only (FR-9.4) — never accepted by restoreBackup
+
+getAppearance(): Promise<AppearanceScheme>   // 'system' | 'light' | 'dark', from preferences
+setAppearance(scheme: AppearanceScheme): Promise<void>
 ```
 
 Export/import is split into `readBackup` and `restoreBackup` rather than a single

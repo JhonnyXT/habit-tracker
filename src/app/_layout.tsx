@@ -8,6 +8,7 @@ import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import { getDatabase } from '@/core/data';
 import { getUseCases } from '@/core/di';
 import { useAppTheme } from '@/core/theme';
+import { useAppearanceStore } from '@/core/theme/appearance-store';
 import { ThemedView } from '@/core/ui';
 import { useOnboardingStore } from '@/features/onboarding/presentation/store';
 import { useReminderNavigation } from '@/features/reminders/presentation/use-reminder-navigation';
@@ -19,6 +20,7 @@ export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const pending = useOnboardingStore((state) => state.pending);
   const startOnboarding = useOnboardingStore((state) => state.start);
+  const setAppearanceScheme = useAppearanceStore((state) => state.setScheme);
 
   useReminderNavigation(isReady);
 
@@ -27,14 +29,18 @@ export default function RootLayout() {
       await getDatabase();
 
       const useCases = await getUseCases();
-      const seen = await useCases.hasSeenOnboarding();
+      const [seen, appearance] = await Promise.all([
+        useCases.hasSeenOnboarding(),
+        useCases.getAppearance(),
+      ]);
 
       startOnboarding(!seen);
+      setAppearanceScheme(appearance);
       setIsReady(true);
 
       requestAnimationFrame(() => SplashScreen.hideAsync());
     })();
-  }, [startOnboarding]);
+  }, [startOnboarding, setAppearanceScheme]);
 
   useEffect(() => {
     if (!isReady) return;

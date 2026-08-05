@@ -31,10 +31,10 @@ src/
   app/                    Expo Router routes (thin, delegate to features)
   core/
     config/               build variant, read from app.config.ts's extra
-    theme/                design tokens (colors, typography, spacing, motion)
+    theme/                design tokens (colors, typography, spacing, motion) + appearance-store (Zustand)
     ui/                   design-system primitives
     i18n/                 all user-facing strings
-    domain/               cross-feature use cases + ports (backup, delete-all, onboarding)
+    domain/               cross-feature use cases + ports (backup, spreadsheet export, delete-all, onboarding, appearance)
     data/                 SQLite connection + migrations + platform adapters
     di/                   composition root
   features/habits/
@@ -67,8 +67,10 @@ src/
 - Reminders: one per habit, persisted and scheduled as local notifications (daily, or one weekly trigger per selected weekday); permission is requested when the switch is turned on, never at launch; tapping a notification deep-links to that habit; `syncReminders` re-schedules from SQLite on every launch. The app declares `SCHEDULE_EXACT_ALARM` so `expo-notifications` takes its exact-alarm path — without it Android batches reminders and they arrive minutes late (measured: 11:54 → 11:56). See `docs/decisions/ADR-005.md`
 - Archive: archive/unarchive from the edit form; archived habits leave Today and appear muted under "Archivados" in the Habits tab, history intact (US-05)
 - Onboarding: one screen on first launch — three principles, then straight into creating the first habit. The flag lives in the `preferences` table (migration 2); routing is declarative via `Stack.Protected`, never an imperative redirect. See `docs/decisions/ADR-006.md`
-- Settings: notification permission, "delete all data", and both backup rows are live
+- Settings: notification permission, appearance, both backup rows, Excel export, and "delete all data" are all live
+- Appearance: Sistema / Claro / Oscuro segmented control in Settings. `core/theme/appearance-store.ts` is a Zustand store `useAppTheme()` reads reactively (replaced a dead module-level variable that never re-rendered anything); persisted via `core/domain/appearance.ts` in the `preferences` table and hydrated at launch alongside the onboarding check. Changing it recolors the whole app instantly and survives a full app restart
 - Export / import (FR-9): export serializes the domain entities to `habit-tracker-YYYY-MM-DD.json` in the cache dir and opens the OS share sheet; import picks a file, validates it **completely before any write** (`parseBackup` in `src/core/domain/backup.ts`), then **replaces** all content and re-schedules reminders. Streaks are never exported — they recompute from the restored history. `backup.test.ts` covers the round trip and every rejection path
+- Excel export: a second, **additive** export (`core/domain/spreadsheet.ts` + `core/data/expo-spreadsheet-file-store.ts`, using the `xlsx` package) that shares a read-only `habit-tracker-YYYY-MM-DD.xlsx` with three sheets — Hábitos, Completados, Recordatorios. It is explicitly **not** a restore format; "Restaurar copia" only ever reads the JSON backup. `xlsx`'s only known vulnerabilities are in its *parser*; this app only ever calls the writer (`XLSX.write`), never `XLSX.read`, so they don't apply here. Covered by `spreadsheet.test.ts`
 - Confirmations use `ConfirmDialog` (`src/core/ui/`), never the platform `Alert`. Omit `cancelLabel` for a single-button notice
 - Build variants: `dev` / `test` / `prod` via `app.config.ts` + `APP_VARIANT`, installable side by side. See `docs/decisions/ADR-007.md`
 

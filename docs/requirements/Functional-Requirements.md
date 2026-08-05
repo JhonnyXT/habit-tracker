@@ -97,6 +97,7 @@ Translate `User-Stories.md` into unambiguous functional rules that engineering i
 - FR-9.1 Export MUST produce a single self-contained file containing all habits (including archived) and all completions.
 - FR-9.2 Import MUST validate the file's structure before applying changes, and MUST fail safely (no partial or corrupted state) if validation fails.
 - FR-9.3 Import MUST fully restore habits and completions such that streaks and history recompute identically to the original data.
+- FR-9.4 The app MAY offer additional, read-only export formats (e.g. a spreadsheet) for viewing or analysis. These are supplementary to, never a replacement for, the FR-9.1 backup file — import (FR-9.2/9.3) only ever accepts that format.
 
 ---
 

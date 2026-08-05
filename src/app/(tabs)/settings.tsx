@@ -5,13 +5,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
 import { useAppTheme } from '@/core/theme';
+import { useAppearanceStore } from '@/core/theme/appearance-store';
+import type { AppearanceScheme } from '@/core/domain/appearance';
 import { strings } from '@/core/i18n';
 import { appVersion } from '@/core/config';
 import { getUseCases } from '@/core/di';
-import { ThemedText, Card, SectionHeader, Divider, ListRow, Enter, ConfirmDialog } from '@/core/ui';
+import {
+  ThemedText,
+  Card,
+  SectionHeader,
+  Divider,
+  ListRow,
+  Enter,
+  ConfirmDialog,
+  SegmentedControl,
+} from '@/core/ui';
 import type { BackupFile } from '@/core/domain/backup';
 import { useHabitsStore } from '@/features/habits/presentation/store';
 import type { NotificationPermission } from '@/features/reminders/domain/notification-scheduler';
+
+const appearanceOptions: { value: AppearanceScheme; label: string }[] = [
+  { value: 'system', label: strings.settings.appearanceSystem },
+  { value: 'light', label: strings.settings.appearanceLight },
+  { value: 'dark', label: strings.settings.appearanceDark },
+];
 
 const permissionLabels: Record<NotificationPermission, string> = {
   granted: strings.settings.permissionGranted,
@@ -33,6 +50,8 @@ export default function SettingsScreen() {
   const [busy, setBusy] = useState(false);
   const loadToday = useHabitsStore((state) => state.loadToday);
   const loadHabits = useHabitsStore((state) => state.loadHabits);
+  const appearance = useAppearanceStore((state) => state.scheme);
+  const setAppearanceScheme = useAppearanceStore((state) => state.setScheme);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,6 +71,27 @@ export default function SettingsScreen() {
     await useCases.deleteAllData();
     await Promise.all([loadToday(), loadHabits()]);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const onChangeAppearance = async (scheme: AppearanceScheme) => {
+    Haptics.selectionAsync();
+    setAppearanceScheme(scheme);
+    const useCases = await getUseCases();
+    await useCases.setAppearance(scheme);
+  };
+
+  const onExportExcel = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const useCases = await getUseCases();
+      const result = await useCases.exportSpreadsheet();
+      if (result.status === 'empty') {
+        notice(strings.settings.exportEmptyTitle, strings.settings.exportEmptyMessage);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onExport = async () => {
@@ -127,6 +167,16 @@ export default function SettingsScreen() {
         </Enter>
 
         <Enter index={1}>
+          <SectionHeader>{strings.settings.appearance}</SectionHeader>
+          <SegmentedControl
+            accessibilityLabel={strings.settings.appearance}
+            value={appearance}
+            onChange={onChangeAppearance}
+            options={appearanceOptions}
+          />
+        </Enter>
+
+        <Enter index={2}>
           <SectionHeader>{strings.settings.notifications}</SectionHeader>
           <Card padded={false}>
             <ListRow
@@ -142,7 +192,7 @@ export default function SettingsScreen() {
           </Card>
         </Enter>
 
-        <Enter index={2}>
+        <Enter index={3}>
           <SectionHeader>{strings.settings.backup}</SectionHeader>
           <Card padded={false}>
             <ListRow
@@ -168,9 +218,26 @@ export default function SettingsScreen() {
           >
             {strings.settings.backupNote}
           </ThemedText>
+
+          <Card padded={false} style={{ marginTop: theme.spacing.md }}>
+            <ListRow
+              label={strings.settings.exportExcel}
+              icon="chart"
+              iconColor={theme.colors.state.success}
+              onPress={onExportExcel}
+              showChevron
+            />
+          </Card>
+          <ThemedText
+            variant="footnote"
+            color="secondary"
+            style={{ marginTop: theme.spacing.sm, marginHorizontal: theme.spacing.xs }}
+          >
+            {strings.settings.exportExcelNote}
+          </ThemedText>
         </Enter>
 
-        <Enter index={3}>
+        <Enter index={4}>
           <SectionHeader>{strings.settings.data}</SectionHeader>
           <Card padded={false}>
             <ListRow
@@ -184,7 +251,7 @@ export default function SettingsScreen() {
           </Card>
         </Enter>
 
-        <Enter index={4}>
+        <Enter index={5}>
           <SectionHeader>{strings.settings.about}</SectionHeader>
           <Card padded={false}>
             <ListRow

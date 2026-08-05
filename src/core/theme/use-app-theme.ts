@@ -4,16 +4,13 @@ import { colors, type ColorScheme } from '@/core/theme/colors';
 import { spacing, radius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import { spring, duration, pressScale } from '@/core/theme/motion';
-
-let manualOverride: ColorScheme | null = null;
-
-export function setAppearanceOverride(scheme: ColorScheme | null) {
-  manualOverride = scheme;
-}
+import { useAppearanceStore } from '@/core/theme/appearance-store';
 
 export function useAppTheme() {
   const systemScheme = useColorScheme();
-  const scheme: ColorScheme = manualOverride ?? (systemScheme === 'dark' ? 'dark' : 'light');
+  const override = useAppearanceStore((state) => state.scheme);
+  const resolvedSystem: ColorScheme = systemScheme === 'dark' ? 'dark' : 'light';
+  const scheme: ColorScheme = override === 'system' ? resolvedSystem : override;
 
   return {
     scheme,
