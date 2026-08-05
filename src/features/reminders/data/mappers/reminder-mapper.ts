@@ -1,4 +1,4 @@
-import type { Reminder } from '@/features/reminders/domain/entities/reminder';
+import type { Reminder, ReminderKind } from '@/features/reminders/domain/entities/reminder';
 
 export type ReminderRow = {
   id: string;
@@ -6,6 +6,7 @@ export type ReminderRow = {
   time: string;
   enabled: number;
   created_at: string;
+  kind: string;
 };
 
 export function toReminder(row: ReminderRow): Reminder {
@@ -14,5 +15,6 @@ export function toReminder(row: ReminderRow): Reminder {
     habitId: row.habit_id,
     time: row.time,
     enabled: row.enabled === 1,
+    kind: (row.kind as ReminderKind) || 'main',
   };
 }

@@ -45,15 +45,32 @@ export function editHabitUseCase(
 
     await habits.upsert(habit);
 
-    const reminder = (await reminders.getForHabit(habit.id))[0];
-    if (reminder?.enabled && (await scheduler.getPermission()) === 'granted') {
-      await scheduler.schedule({
-        reminderId: reminder.id,
-        habitId: habit.id,
-        habitName: habit.name,
-        time: reminder.time,
-        days: daysFor(habit),
-      });
+    let habitReminders = await reminders.getForHabit(habit.id);
+
+    // Pre-reminders and follow-ups only exist for daily habits (see
+    // set-habit-reminder.ts) — if the schedule changed away from daily,
+    // drop them instead of letting them get rescheduled below multiplied
+    // across the new weekday set.
+    if (habit.schedule.type !== 'daily') {
+      for (const reminder of habitReminders) {
+        if (reminder.kind === 'main') continue;
+        await scheduler.cancel(reminder.id);
+        await reminders.delete(reminder.id);
+      }
+      habitReminders = habitReminders.filter((reminder) => reminder.kind === 'main');
+    }
+
+    const permission = await scheduler.getPermission();
+    if (permission === 'granted') {
+      for (const reminder of habitReminders.filter((entry) => entry.enabled)) {
+        await scheduler.schedule({
+          reminderId: reminder.id,
+          habitId: habit.id,
+          habitName: habit.name,
+          time: reminder.time,
+          days: reminder.kind === 'main' ? daysFor(habit) : null,
+        });
+      }
     }
 
     return { ok: true, habit };

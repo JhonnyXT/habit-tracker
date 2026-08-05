@@ -9,10 +9,20 @@ import {
   type Weekday,
 } from '@/features/habits/domain/entities/habit';
 import { isClockTime, type Reminder } from '@/features/reminders/domain/entities/reminder';
+import {
+  MAX_TASK_NAME_LENGTH,
+  type Task,
+  type TaskCompletion,
+} from '@/features/habits/domain/entities/task';
 
 export const BACKUP_FORMAT_VERSION = 1;
 
 export type BackupHabit = Omit<Habit, 'createdAt' | 'updatedAt'> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BackupTask = Omit<Task, 'createdAt' | 'updatedAt'> & {
   createdAt: string;
   updatedAt: string;
 };
@@ -23,6 +33,8 @@ export type BackupFile = {
   habits: BackupHabit[];
   completions: Completion[];
   reminders: Reminder[];
+  tasks: BackupTask[];
+  taskCompletions: TaskCompletion[];
 };
 
 export type BackupErrorCode =
@@ -33,6 +45,8 @@ export type BackupErrorCode =
   | 'malformedHabit'
   | 'malformedCompletion'
   | 'malformedReminder'
+  | 'malformedTask'
+  | 'malformedTaskCompletion'
   | 'orphanRecord';
 
 export type BackupParseResult =
@@ -44,6 +58,8 @@ export function buildBackup(
   completions: Completion[],
   reminders: Reminder[],
   exportedAt: Date,
+  tasks: Task[] = [],
+  taskCompletions: TaskCompletion[] = [],
 ): BackupFile {
   return {
     formatVersion: BACKUP_FORMAT_VERSION,
@@ -55,6 +71,12 @@ export function buildBackup(
     })),
     completions,
     reminders,
+    tasks: tasks.map((task) => ({
+      ...task,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+    })),
+    taskCompletions,
   };
 }
 
@@ -63,6 +85,14 @@ export function backupToHabits(file: BackupFile): Habit[] {
     ...habit,
     createdAt: new Date(habit.createdAt),
     updatedAt: new Date(habit.updatedAt),
+  }));
+}
+
+export function backupToTasks(file: BackupFile): Task[] {
+  return file.tasks.map((task) => ({
+    ...task,
+    createdAt: new Date(task.createdAt),
+    updatedAt: new Date(task.updatedAt),
   }));
 }
 
@@ -136,6 +166,8 @@ function isCompletion(value: unknown): value is Completion {
   );
 }
 
+const reminderKinds = ['main', 'pre', 'followup'];
+
 function isReminder(value: unknown): value is Reminder {
   return (
     isRecord(value) &&
@@ -143,7 +175,39 @@ function isReminder(value: unknown): value is Reminder {
     isNonEmptyString(value.habitId) &&
     typeof value.time === 'string' &&
     isClockTime(value.time) &&
-    typeof value.enabled === 'boolean'
+    typeof value.enabled === 'boolean' &&
+    reminderKinds.includes(value.kind as string)
+  );
+}
+
+// Backups written before multi-alert reminders existed have no `kind` on a
+// reminder — every reminder they contain was, by definition, the main one.
+function withDefaultReminderKind(value: unknown): unknown {
+  if (!isRecord(value) || value.kind !== undefined) return value;
+  return { ...value, kind: 'main' };
+}
+
+function isBackupTask(value: unknown): value is BackupTask {
+  if (!isRecord(value)) return false;
+
+  return (
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.habitId) &&
+    isNonEmptyString(value.name) &&
+    value.name.length <= MAX_TASK_NAME_LENGTH &&
+    typeof value.sortOrder === 'number' &&
+    typeof value.archived === 'boolean' &&
+    isISODateTime(value.createdAt) &&
+    isISODateTime(value.updatedAt)
+  );
+}
+
+function isTaskCompletion(value: unknown): value is TaskCompletion {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.taskId) &&
+    isISODate(value.date)
   );
 }
 
@@ -170,16 +234,34 @@ export function parseBackup(raw: string): BackupParseResult {
     return { ok: false, code: 'missingArrays' };
   }
 
+  // Backups written before Habit Tasks existed have no `tasks`/`taskCompletions` arrays.
+  // Treat them as empty rather than rejecting the whole backup.
+  const tasksValue = value.tasks ?? [];
+  const taskCompletionsValue = value.taskCompletions ?? [];
+  if (!Array.isArray(tasksValue) || !Array.isArray(taskCompletionsValue)) {
+    return { ok: false, code: 'missingArrays' };
+  }
+
+  const remindersValue = value.reminders.map(withDefaultReminderKind);
+
   if (!value.habits.every(isBackupHabit)) return { ok: false, code: 'malformedHabit' };
   if (!value.completions.every(isCompletion)) return { ok: false, code: 'malformedCompletion' };
-  if (!value.reminders.every(isReminder)) return { ok: false, code: 'malformedReminder' };
+  if (!remindersValue.every(isReminder)) return { ok: false, code: 'malformedReminder' };
+  if (!tasksValue.every(isBackupTask)) return { ok: false, code: 'malformedTask' };
+  if (!taskCompletionsValue.every(isTaskCompletion)) {
+    return { ok: false, code: 'malformedTaskCompletion' };
+  }
 
   const habitIds = new Set(value.habits.map((habit) => habit.id));
   const referencesKnownHabit = (record: { habitId: string }) => habitIds.has(record.habitId);
+  const taskIds = new Set(tasksValue.map((task) => task.id));
+  const referencesKnownTask = (record: { taskId: string }) => taskIds.has(record.taskId);
 
   if (
     !value.completions.every(referencesKnownHabit) ||
-    !value.reminders.every(referencesKnownHabit)
+    !remindersValue.every(referencesKnownHabit) ||
+    !tasksValue.every(referencesKnownHabit) ||
+    !taskCompletionsValue.every(referencesKnownTask)
   ) {
     return { ok: false, code: 'orphanRecord' };
   }
@@ -193,7 +275,9 @@ export function parseBackup(raw: string): BackupParseResult {
         : new Date(0).toISOString(),
       habits: value.habits,
       completions: value.completions,
-      reminders: value.reminders,
+      reminders: remindersValue,
+      tasks: tasksValue,
+      taskCompletions: taskCompletionsValue,
     },
   };
 }

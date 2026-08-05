@@ -29,7 +29,13 @@ const weekdays: Habit = {
   updatedAt: new Date('2026-06-15T08:00:00.000Z'),
 };
 
-const reminder: Reminder = { id: 'r-1', habitId: 'habit-1', time: '07:30', enabled: true };
+const reminder: Reminder = {
+  id: 'r-1',
+  habitId: 'habit-1',
+  time: '07:30',
+  enabled: true,
+  kind: 'main',
+};
 
 describe('spreadsheetFileName', () => {
   it('names the file by the export date', () => {

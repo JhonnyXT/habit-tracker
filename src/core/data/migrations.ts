@@ -56,6 +56,41 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 3,
+    up: async (db) => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS tasks (
+          id TEXT PRIMARY KEY NOT NULL,
+          habit_id TEXT NOT NULL REFERENCES habits(id),
+          name TEXT NOT NULL,
+          sort_order INTEGER NOT NULL,
+          archived INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS task_completions (
+          id TEXT PRIMARY KEY NOT NULL,
+          task_id TEXT NOT NULL REFERENCES tasks(id),
+          date TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          UNIQUE (task_id, date)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_task_completions_task_date
+          ON task_completions (task_id, date);
+      `);
+    },
+  },
+  {
+    version: 4,
+    up: async (db) => {
+      await db.execAsync(`
+        ALTER TABLE reminders ADD COLUMN kind TEXT NOT NULL DEFAULT 'main';
+      `);
+    },
+  },
 ];
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {

@@ -2,12 +2,14 @@ import {
   BACKUP_FORMAT_VERSION,
   backupFileName,
   backupToHabits,
+  backupToTasks,
   buildBackup,
   parseBackup,
 } from '@/core/domain/backup';
 import { computeStreaks } from '@/features/habits/domain/streak';
 import type { Completion, Habit } from '@/features/habits/domain/entities/habit';
 import type { Reminder } from '@/features/reminders/domain/entities/reminder';
+import type { Task, TaskCompletion } from '@/features/habits/domain/entities/task';
 
 const exportedAt = new Date('2026-08-03T10:00:00.000Z');
 
@@ -29,7 +31,25 @@ const completions: Completion[] = [
   { id: 'c-3', habitId: 'habit-1', date: '2026-07-30' },
 ];
 
-const reminder: Reminder = { id: 'r-1', habitId: 'habit-1', time: '07:30', enabled: true };
+const reminder: Reminder = {
+  id: 'r-1',
+  habitId: 'habit-1',
+  time: '07:30',
+  enabled: true,
+  kind: 'main',
+};
+
+const task: Task = {
+  id: 'task-1',
+  habitId: 'habit-1',
+  name: 'Estirar',
+  sortOrder: 0,
+  archived: false,
+  createdAt: new Date('2026-07-01T08:00:00.000Z'),
+  updatedAt: new Date('2026-07-01T08:00:00.000Z'),
+};
+
+const taskCompletions: TaskCompletion[] = [{ id: 'tc-1', taskId: 'task-1', date: '2026-07-30' }];
 
 function serialize(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
@@ -79,6 +99,64 @@ describe('backup round trip', () => {
 
   it('names the file by the export date', () => {
     expect(backupFileName(new Date(2026, 7, 3))).toBe('habit-tracker-2026-08-03.json');
+  });
+});
+
+describe('backup round trip (tasks)', () => {
+  it('restores tasks and their completions intact', () => {
+    const file = buildBackup([habit], completions, [reminder], exportedAt, [task], taskCompletions);
+    const parsed = parseBackup(JSON.stringify(file));
+    if (!parsed.ok) throw new Error(`expected a valid backup, got ${parsed.code}`);
+
+    expect(backupToTasks(parsed.file)).toEqual([task]);
+    expect(parsed.file.taskCompletions).toEqual(taskCompletions);
+  });
+
+  it('does not let task completions affect the habit streak (independent by construction)', () => {
+    const before = computeStreaks(
+      habit.schedule,
+      completions.map((completion) => completion.date),
+      '2026-07-30',
+    );
+
+    const file = buildBackup([habit], completions, [reminder], exportedAt, [task], taskCompletions);
+    const parsed = parseBackup(JSON.stringify(file));
+    if (!parsed.ok) throw new Error(`expected a valid backup, got ${parsed.code}`);
+
+    const after = computeStreaks(
+      backupToHabits(parsed.file)[0].schedule,
+      parsed.file.completions.map((completion) => completion.date),
+      '2026-07-30',
+    );
+
+    expect(after).toEqual(before);
+  });
+
+  it('treats a backup written before Habit Tasks existed as having no tasks', () => {
+    const file = buildBackup([habit], completions, [reminder], exportedAt) as Record<
+      string,
+      unknown
+    >;
+    delete file.tasks;
+    delete file.taskCompletions;
+
+    const parsed = parseBackup(JSON.stringify(file));
+    if (!parsed.ok) throw new Error(`expected a valid backup, got ${parsed.code}`);
+
+    expect(parsed.file.tasks).toEqual([]);
+    expect(parsed.file.taskCompletions).toEqual([]);
+  });
+
+  it('treats a reminder from before multi-alert reminders existed as "main"', () => {
+    const file = buildBackup([habit], completions, [reminder], exportedAt) as {
+      reminders: Record<string, unknown>[];
+    };
+    delete file.reminders[0].kind;
+
+    const parsed = parseBackup(JSON.stringify(file));
+    if (!parsed.ok) throw new Error(`expected a valid backup, got ${parsed.code}`);
+
+    expect(parsed.file.reminders[0].kind).toBe('main');
   });
 });
 
@@ -147,9 +225,52 @@ describe('backup validation (FR-9.2)', () => {
     });
   });
 
+  it('rejects a reminder with an unknown kind', () => {
+    const broken = [{ id: 'r-9', habitId: 'habit-1', time: '07:30', enabled: true, kind: 'nag' }];
+    expect(parseBackup(serialize({ reminders: broken }))).toEqual({
+      ok: false,
+      code: 'malformedReminder',
+    });
+  });
+
   it('rejects a reminder pointing at a habit the file does not contain', () => {
     const orphan = [{ id: 'r-9', habitId: 'ghost', time: '07:30', enabled: true }];
     expect(parseBackup(serialize({ reminders: orphan }))).toEqual({
+      ok: false,
+      code: 'orphanRecord',
+    });
+  });
+
+  it('rejects a task whose name is too long', () => {
+    const broken = [{ ...task, createdAt: task.createdAt.toISOString(), updatedAt: task.updatedAt.toISOString(), name: 'x'.repeat(61) }];
+    expect(parseBackup(serialize({ tasks: broken }))).toEqual({
+      ok: false,
+      code: 'malformedTask',
+    });
+  });
+
+  it('rejects a task completion whose date is not a calendar date', () => {
+    const brokenTask = [{ ...task, createdAt: task.createdAt.toISOString(), updatedAt: task.updatedAt.toISOString() }];
+    const broken = [{ id: 'tc-9', taskId: 'task-1', date: '30/07/2026' }];
+    expect(parseBackup(serialize({ tasks: brokenTask, taskCompletions: broken }))).toEqual({
+      ok: false,
+      code: 'malformedTaskCompletion',
+    });
+  });
+
+  it('rejects a task pointing at a habit the file does not contain', () => {
+    const orphan = [
+      { id: 't-9', habitId: 'ghost', name: 'Fantasma', sortOrder: 0, archived: false, createdAt: exportedAt.toISOString(), updatedAt: exportedAt.toISOString() },
+    ];
+    expect(parseBackup(serialize({ tasks: orphan }))).toEqual({
+      ok: false,
+      code: 'orphanRecord',
+    });
+  });
+
+  it('rejects a task completion pointing at a task the file does not contain', () => {
+    const orphan = [{ id: 'tc-9', taskId: 'ghost', date: '2026-07-30' }];
+    expect(parseBackup(serialize({ taskCompletions: orphan }))).toEqual({
       ok: false,
       code: 'orphanRecord',
     });
