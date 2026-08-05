@@ -9,7 +9,7 @@
 | Property | Value |
 |----------|-------|
 | Document | Expo UI — Applied Notes |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Audience | Design, Engineering |
 | Depends On | `03-Design-System.md`, `Components.md`, `android-material3.md`, `ios-hig.md` |
@@ -20,6 +20,8 @@
 # Purpose
 
 Evaluate `@expo/ui` — Expo's package of real SwiftUI / Jetpack Compose bindings — against this app's current hand-rolled design system, and give a concrete adopt/reject call per area rather than a generic "it's neat" summary.
+
+**Correction (this revision):** an earlier version of this document argued `@expo/ui` would "fragment" a single, platform-identical design system this app is supposedly built around. That was wrong — it never checked the project's own founding documents first. `requirements/00-Project-Charter.md`'s Vision states *"the application should feel native on both iOS and Android"*, and names **Native First** as a core pillar: *"the application should behave like a native mobile application. Respect platform conventions. Do not fight the operating system."* `03-Design-System.md`'s **Platform Fidelity** section says the same thing directly: *"The system favors platform-native feel over strict pixel-parity between iOS and Android... shared components... may render with platform-appropriate details."* Rendering genuinely different, platform-correct controls is not a deviation from this project's design philosophy — it's a truer implementation of it than the current hand-rolled components, which render identically on both platforms today. The rest of this document is corrected accordingly.
 
 ---
 
@@ -45,9 +47,15 @@ Separately: the examples repo's own README says plainly *"`@expo/ui` renders rea
 
 ---
 
+# Performance — aligned with the Charter, not a trade-off against it
+
+`requirements/00-Project-Charter.md`'s Performance Commitment treats 60 FPS, fast startup, and minimal unnecessary renders as product features, not nice-to-haves. `@expo/ui` renders through Fabric straight to native SwiftUI/Compose views — the platform draws its own controls directly, the same way the native Settings app does, rather than React Native re-implementing them in JS-driven styles. That is structurally *more* aligned with the performance goal than more hand-rolled Reanimated work would be, not less. The one concrete regression on record is unrelated to `@expo/ui` itself: SDK 55+'s `react-native-reanimated` (4.3+) has a known Hermes memory regression (+25–30%) from the import alone — worth watching after the SDK upgrade regardless of whether `@expo/ui` is adopted.
+
+---
+
 # Where it would genuinely help this app
 
-## Settings screen — the one clear win
+## Settings screen — the clearest, lowest-risk starting point
 
 The examples repo's **Universal Settings** demo (`FieldGroup` + `FieldGroup.Section` + `FieldGroup.SectionHeader` + `FieldGroup.SectionFooter`) renders one component tree as a real SwiftUI `Form` on iOS and a Material 3 grouped list on Android — pixel- and interaction-perfect on both, for free:
 
@@ -63,7 +71,7 @@ import { Button, Checkbox, Host, FieldGroup, Switch, Text } from '@expo/ui';
 </Host>
 ```
 
-Our `settings.tsx` currently *hand-fakes* this exact look with `Card` + `SectionHeader` + `Divider` + `ListRow` (`docs/design/Components.md`'s "Card / SectionHeader / Divider" and "ListRow" entries). A settings screen is one of the few places where looking like the *platform's own* settings UI is a bigger win than looking like our own brand — unlike Today or Habit Detail, which are core-loop screens this app owns visually end to end. If this project ever adopts `@expo/ui`, **Settings is the one screen worth a scoped pilot**, after the SDK upgrade above, as its own task — not bundled into a feature change.
+Our `settings.tsx` currently *hand-fakes* this exact look with `Card` + `SectionHeader` + `Divider` + `ListRow` (`docs/design/Components.md`'s "Card / SectionHeader / Divider" and "ListRow" entries) — the same rendering on both platforms. Settings is the natural first pilot not because other screens shouldn't follow, but because it's the lowest-risk place to verify the whole approach (SwiftUI `Form` behavior, Android's Material 3 grouped list, the `Host`/`seedColor` theming bridge) before touching the core loop (Today) that the Charter calls sacred. Once verified, the same pattern — real platform controls instead of a hand-rolled approximation — is the right direction for Add/Edit Habit's form fields and Habit Detail's stat/segmented pieces too; they're just later in the rollout, not excluded from it.
 
 ## Reminder time picker — lateral, not worth it alone
 
@@ -75,16 +83,16 @@ We don't have any bottom sheets today (`habit-form` is a full modal presentation
 
 ---
 
-# Where it does not fit this app
+# Trade-offs worth naming, even where the direction is right
 
-## It splits one design system into two
+## Adopting it broadly means real per-platform divergence — by design
 
-This app's whole design premise (`03-Design-System.md`) is **one** custom visual and motion language — the same colors, spacing, and spring-based motion on iOS and Android alike (`docs/design/Motion.md`, `CLAUDE.md`'s Design section). `@expo/ui`'s platform-specific bindings do the opposite on purpose: a SwiftUI `Form` looks like iOS Settings, a Compose grouped list looks like Android Settings — genuinely different per platform. Adopting it anywhere beyond a deliberately-chosen "should look like the OS" screen (Settings) means accepting visual divergence between platforms everywhere it's used. That's a product decision for the user to make explicitly, not something to slip in one component at a time.
+`@expo/ui`'s platform-specific bindings render a SwiftUI `Form` on iOS and a Material 3 grouped list on Android — genuinely different per platform, on purpose. Per the Charter and `03-Design-System.md` (corrected above), that divergence is the *goal*, not a cost to minimize. The one thing worth being deliberate about is **staging**, not philosophy: this is a real rewrite of every screen's controls, and the Charter's own Immutable Rules include *"never ship unfinished interactions"* and treat performance/UX regressions as bugs. That argues for rolling `@expo/ui` out screen by screen, verified on real hardware each time (per this project's existing `Verifying on the device` practice in `CLAUDE.md`), not for holding back on principle.
 
-## Our hand-rolled components already do the job, with our own motion
+## Our hand-rolled components — replace deliberately, not reflexively
 
-- **`SegmentedControl`** (schedule type in Add/Edit Habit, Año/Mes in Habit Detail, Apariencia in Settings) already has a spring-animated sliding pill matching `theme.motion.spring.snappy` exactly, per `docs/design/Components.md`. `@expo/ui`'s `Picker`/`SegmentedControl` would replace that with the native platform look and the native platform's own animation curve — losing the "springs, not fixed curves" motion identity this app is built around (`CLAUDE.md`'s Design section), in exchange for a more "authentically native" chrome. Not worth it without a deliberate call.
-- **`Switch`** — RN's built-in `Switch` (already used in the reminder toggle) does the same job; no reason to add a dependency for parity.
+- **`SegmentedControl`** (schedule type in Add/Edit Habit, Año/Mes in Habit Detail, Apariencia in Settings) has a spring-animated sliding pill matching `theme.motion.spring.snappy`. `@expo/ui`'s `Picker`/`SegmentedControl` would swap that for each platform's own native control and its own native animation curve — which is *more* native-first, per the Charter, not less. The trade is losing one custom detail (our specific spring feel) for the platform's own, genuinely native one. Worth doing as part of the same screen-by-screen rollout below, not left out by default.
+- **`Switch`** — RN's built-in `Switch` (already used in the reminder toggle) already renders as the real native switch on each platform; `@expo/ui`'s universal `Switch` is equivalent here, so swapping it isn't a priority either way.
 
 ## iOS-only or Android-only pieces, not universal
 
@@ -99,19 +107,22 @@ Several of the examples repo's flashier demos are single-platform only, meaning 
 
 # Recommendation
 
-Don't adopt `@expo/ui` broadly — it would fragment the one design system this app is built around, and half its interesting pieces are single-platform anyway. If the user wants to explore it, the concrete, bounded path is:
+Adopt `@expo/ui` — it's the more faithful implementation of this project's own stated Native First / Platform Fidelity principles, not a departure from them. Sequence it for risk, not because the direction is in question:
 
-1. Plan an Expo SDK upgrade (54 → 55+) as its own task, verified against expo-router, Reanimated/Gesture Handler, and all three build variants — not bundled with a feature change.
-2. Pilot `FieldGroup`/`Section`/`SectionHeader`/`SectionFooter` on the Settings screen only, since "look like the OS's own settings" is a case where native chrome beats brand consistency.
-3. Leave Today, Habits, Habit Detail, and Add/Edit Habit exactly as they are — their current hand-rolled components already match this app's motion and color system, which `@expo/ui` cannot reproduce (it renders each OS's own animation curves, not ours).
+1. Finish the Expo SDK upgrade (54 → 57) as its own task, verified against expo-router, Reanimated/Gesture Handler, and all three build variants — already underway on `expo-sdk-57-upgrade`.
+2. Pilot `FieldGroup`/`Section`/`SectionHeader`/`SectionFooter` on the Settings screen first — lowest risk, and "should look like the OS's own settings" is the clearest case for it. Verify on real Android and iOS hardware before going further, per the Charter's performance and quality bars.
+3. Once verified, extend the same native-controls approach to Add/Edit Habit's form fields and Habit Detail's stat/segmented pieces.
+4. Today stays hand-rolled longest, deliberately — it's the Charter's "sacred" core loop, and its current custom motion (drag-to-reorder, swipe actions, the day-complete moment) has no `@expo/ui` equivalent to replace it with; nothing here argues for touching it soon.
+5. Skip the iOS-only or Android-only showpieces (Liquid Glass, Siri Glow, Numeric Transitions, Swift Charts, Material You wallpaper theming) for now — genuinely useful later, but each needs its own platform branch, and none map to a concrete need this app has today. Material You's wallpaper-seeded palette specifically conflicts with `docs/design/Colors.md`'s fixed flame-orange brand accent — treat that one as excluded, not just deferred.
 
 ---
 
 # Related Documents
 
-- `03-Design-System.md` — the one-system-both-platforms premise this evaluation weighs against.
-- `Components.md` — the hand-rolled components (`SegmentedControl`, `ListRow`, `Card`/`SectionHeader`/`Divider`) that `@expo/ui` would compete with.
-- `android-material3.md`, `ios-hig.md` — the per-platform research this app already draws from without adopting native-only tooling.
+- `00-Project-Charter.md` — Native First, Platform Fidelity, and the Performance Commitment this recommendation is built on.
+- `03-Design-System.md` — the Platform Fidelity section this evaluation now correctly reflects.
+- `Components.md` — the hand-rolled components (`SegmentedControl`, `ListRow`, `Card`/`SectionHeader`/`Divider`) the rollout replaces, screen by screen.
+- `android-material3.md`, `ios-hig.md` — the per-platform research this app already draws from; `@expo/ui` is the implementation path for it, not an alternative to it.
 - `docs/decisions/ADR-007.md` — the closest precedent for treating an SDK-level change as its own planned task.
 
 ---
