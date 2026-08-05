@@ -1,25 +1,18 @@
 import { useCallback, useState } from 'react';
-import { Linking, ScrollView } from 'react-native';
+import { Linking, ScrollView, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 
-import { useAppTheme } from '@/core/theme';
 import { useAppearanceStore } from '@/core/theme/appearance-store';
 import type { AppearanceScheme } from '@/core/domain/appearance';
 import { strings } from '@/core/i18n';
 import { appVersion } from '@/core/config';
 import { getUseCases } from '@/core/di';
-import {
-  ThemedText,
-  Card,
-  SectionHeader,
-  Divider,
-  ListRow,
-  Enter,
-  ConfirmDialog,
-  SegmentedControl,
-} from '@/core/ui';
+import { ConfirmDialog, Enter } from '@/core/ui';
+import { SettingsContainer } from '@/core/ui-nw/settings-container';
+import { SettingsItem } from '@/core/ui-nw/settings-item';
+import { SegmentedControl } from '@/core/ui-nw/segmented-control';
 import type { BackupFile } from '@/core/domain/backup';
 import { useHabitsStore } from '@/features/habits/presentation/store';
 import type { NotificationPermission } from '@/features/reminders/domain/notification-scheduler';
@@ -43,8 +36,6 @@ type Dialog =
   | { kind: 'notice'; title: string; message: string };
 
 export default function SettingsScreen() {
-  const theme = useAppTheme();
-  const rowInset = theme.spacing.md * 2 + 30;
   const [permission, setPermission] = useState<NotificationPermission>('undetermined');
   const [dialog, setDialog] = useState<Dialog>({ kind: 'none' });
   const [busy, setBusy] = useState(false);
@@ -153,114 +144,108 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.surface.primary }} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-neutral-100 dark:bg-black" edges={['top']}>
       <ScrollView
-        contentContainerStyle={{
-          padding: theme.spacing.md,
-          paddingBottom: theme.spacing.xxl * 2.5,
-          gap: theme.spacing.lg,
-        }}
+        contentContainerClassName="gap-6 p-4 pb-24"
         showsVerticalScrollIndicator={false}
       >
         <Enter index={0}>
-          <ThemedText variant="largeTitle">{strings.settings.title}</ThemedText>
+          <Text className="text-[34px] leading-[40px] tracking-[-0.7px] font-bold text-neutral-900 dark:text-neutral-50">
+            {strings.settings.title}
+          </Text>
         </Enter>
 
         <Enter index={1}>
-          <SectionHeader>{strings.settings.appearance}</SectionHeader>
-          <SegmentedControl
-            accessibilityLabel={strings.settings.appearance}
-            value={appearance}
-            onChange={onChangeAppearance}
-            options={appearanceOptions}
-          />
+          <View className="gap-2">
+            <Text className="ml-1 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+              {strings.settings.appearance}
+            </Text>
+            <SegmentedControl
+              accessibilityLabel={strings.settings.appearance}
+              value={appearance}
+              onChange={onChangeAppearance}
+              options={appearanceOptions}
+            />
+          </View>
         </Enter>
 
         <Enter index={2}>
-          <SectionHeader>{strings.settings.notifications}</SectionHeader>
-          <Card padded={false}>
-            <ListRow
+          <SettingsContainer title={strings.settings.notifications}>
+            <SettingsItem
               label={strings.settings.permission}
               icon="bell"
-              iconColor={
-                permission === 'granted' ? theme.colors.state.success : theme.colors.state.danger
-              }
+              tone={permission === 'granted' ? 'success' : 'danger'}
               detail={permissionLabels[permission]}
               onPress={onPressPermission}
               showChevron
+              isLast
             />
-          </Card>
+          </SettingsContainer>
         </Enter>
 
         <Enter index={3}>
-          <SectionHeader>{strings.settings.backup}</SectionHeader>
-          <Card padded={false}>
-            <ListRow
-              label={strings.settings.exportBackup}
-              icon="export"
-              iconColor={theme.colors.accent.default}
-              onPress={onExport}
-              showChevron
-            />
-            <Divider inset={rowInset} />
-            <ListRow
-              label={strings.settings.restoreBackup}
-              icon="restore"
-              iconColor={theme.colors.habit.orange.solid}
-              onPress={onPickBackup}
-              showChevron
-            />
-          </Card>
-          <ThemedText
-            variant="footnote"
-            color="secondary"
-            style={{ marginTop: theme.spacing.sm, marginHorizontal: theme.spacing.xs }}
-          >
-            {strings.settings.backupNote}
-          </ThemedText>
+          <View className="gap-3">
+            <SettingsContainer title={strings.settings.backup}>
+              <SettingsItem
+                label={strings.settings.exportBackup}
+                icon="export"
+                tone="primary"
+                onPress={onExport}
+                showChevron
+              />
+              <SettingsItem
+                label={strings.settings.restoreBackup}
+                icon="restore"
+                tone="primary"
+                onPress={onPickBackup}
+                showChevron
+                isLast
+              />
+            </SettingsContainer>
+            <Text className="mx-1 text-[13px] leading-[18px] text-neutral-500 dark:text-neutral-400">
+              {strings.settings.backupNote}
+            </Text>
 
-          <Card padded={false} style={{ marginTop: theme.spacing.md }}>
-            <ListRow
-              label={strings.settings.exportExcel}
-              icon="chart"
-              iconColor={theme.colors.state.success}
-              onPress={onExportExcel}
-              showChevron
-            />
-          </Card>
-          <ThemedText
-            variant="footnote"
-            color="secondary"
-            style={{ marginTop: theme.spacing.sm, marginHorizontal: theme.spacing.xs }}
-          >
-            {strings.settings.exportExcelNote}
-          </ThemedText>
+            <SettingsContainer title={strings.settings.spreadsheetSection}>
+              <SettingsItem
+                label={strings.settings.exportExcel}
+                icon="chart"
+                tone="success"
+                onPress={onExportExcel}
+                showChevron
+                isLast
+              />
+            </SettingsContainer>
+            <Text className="mx-1 text-[13px] leading-[18px] text-neutral-500 dark:text-neutral-400">
+              {strings.settings.exportExcelNote}
+            </Text>
+          </View>
         </Enter>
 
         <Enter index={4}>
-          <SectionHeader>{strings.settings.data}</SectionHeader>
-          <Card padded={false}>
-            <ListRow
+          <SettingsContainer title={strings.settings.data}>
+            <SettingsItem
               label={strings.settings.deleteAll}
               icon="trash"
-              iconColor={theme.colors.state.danger}
+              tone="danger"
               destructive
               onPress={() => setDialog({ kind: 'deleteAll' })}
               showChevron
+              isLast
             />
-          </Card>
+          </SettingsContainer>
         </Enter>
 
         <Enter index={5}>
-          <SectionHeader>{strings.settings.about}</SectionHeader>
-          <Card padded={false}>
-            <ListRow
+          <SettingsContainer title={strings.settings.about}>
+            <SettingsItem
               label={strings.settings.version}
               icon="info"
-              iconColor={theme.colors.text.secondary}
+              tone="neutral"
               detail={appVersion}
+              isLast
             />
-          </Card>
+          </SettingsContainer>
         </Enter>
       </ScrollView>
 
