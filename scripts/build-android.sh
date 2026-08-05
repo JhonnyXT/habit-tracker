@@ -31,8 +31,15 @@ export APP_VARIANT="$VARIANT"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "==> prebuild ($VARIANT)"
-npx expo prebuild --platform android --clean
+LAST_VARIANT_FILE="android/.last-variant"
+if [ -d android ] && [ "$(cat "$LAST_VARIANT_FILE" 2>/dev/null || true)" = "$VARIANT" ]; then
+  echo "==> prebuild ($VARIANT, incremental — same variant as last build)"
+  npx expo prebuild --platform android
+else
+  echo "==> prebuild ($VARIANT, clean — variant changed or first build)"
+  npx expo prebuild --platform android --clean
+fi
+echo "$VARIANT" > "$LAST_VARIANT_FILE"
 
 echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 

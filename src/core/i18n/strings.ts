@@ -139,6 +139,7 @@ export const strings = {
     appearanceLight: 'Claro',
     appearanceDark: 'Oscuro',
 
+    spreadsheetSection: 'Hoja de cálculo',
     exportExcel: 'Exportar a Excel',
     exportExcelNote: 'Una hoja de cálculo con tus hábitos, tu historial y tus recordatorios, para leer o analizar. No sirve para restaurar: usa la copia de seguridad para eso.',
 

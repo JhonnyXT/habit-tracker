@@ -265,11 +265,23 @@ function DraggableRow({
               width: ACTION_WIDTH,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: theme.colors.surface.elevated,
+              backgroundColor: theme.colors.surface.secondary,
             }}
           >
-            <Animated.View style={editStyle}>
-              <Icon name="edit" size={20} color={theme.colors.text.primary} />
+            <Animated.View
+              style={[
+                editStyle,
+                {
+                  width: 40,
+                  height: 40,
+                  borderRadius: theme.radius.full,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.colors.accent.subtle,
+                },
+              ]}
+            >
+              <Icon name="edit" size={18} color={theme.colors.accent.default} />
             </Animated.View>
           </Pressable>
 
@@ -285,11 +297,23 @@ function DraggableRow({
               width: ACTION_WIDTH,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: theme.colors.state.danger,
+              backgroundColor: theme.colors.surface.secondary,
             }}
           >
-            <Animated.View style={deleteStyle}>
-              <Icon name="trash" size={20} color={theme.colors.text.onSolid} />
+            <Animated.View
+              style={[
+                deleteStyle,
+                {
+                  width: 40,
+                  height: 40,
+                  borderRadius: theme.radius.full,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: theme.colors.state.dangerSubtle,
+                },
+              ]}
+            >
+              <Icon name="trash" size={18} color={theme.colors.state.danger} />
             </Animated.View>
           </Pressable>
         </Animated.View>
@@ -418,6 +442,7 @@ export function DraggableHabitList<T>({
             right: 0,
             height: 1,
             backgroundColor: theme.colors.border.default,
+            opacity: 0.5,
           }}
         />
       ))}

@@ -1,9 +1,12 @@
+import '../../global.css';
+
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
+import { colorScheme as nativewindColorScheme } from 'nativewind';
 
 import { getDatabase } from '@/core/data';
 import { getUseCases } from '@/core/di';
@@ -20,9 +23,14 @@ export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const pending = useOnboardingStore((state) => state.pending);
   const startOnboarding = useOnboardingStore((state) => state.start);
+  const appearanceScheme = useAppearanceStore((state) => state.scheme);
   const setAppearanceScheme = useAppearanceStore((state) => state.setScheme);
 
   useReminderNavigation(isReady);
+
+  useEffect(() => {
+    nativewindColorScheme.set(appearanceScheme);
+  }, [appearanceScheme]);
 
   useEffect(() => {
     (async () => {
