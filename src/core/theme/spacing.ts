@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export const spacing = {
   xxs: 2,
   xs: 4,
@@ -14,7 +16,7 @@ export const radius = {
   sm: 8,
   md: 12,
 
-  lg: 16,
+  lg: Platform.select({ ios: 24, default: 16 }),
 
   xl: 24,
 
