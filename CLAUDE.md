@@ -4,6 +4,23 @@ Local-first habit tracking app. React Native + Expo + TypeScript. Android dev bu
 
 ---
 
+## Active initiative: Expo SDK 54 → 57 upgrade
+
+Branch `expo-sdk-57-upgrade` (off `main`, pushed). Goal: adopt `@expo/ui` (see `docs/research/expo-ui.md`) for a platform-native Settings screen — real SwiftUI controls on iOS, real Material 3 on Android, from one component tree, matching the reference demo at `SchroederNathan/expo-ui-examples`. `@expo/ui` has no release for SDK 54 (jumps 55→56/57), so the SDK bump is a prerequisite, done as its own task before touching any screen.
+
+Target: **SDK 57** directly (skip 55/56 as intermediate stops). Known deltas from the current versions (`react` 19.1.0, `react-native` 0.81.5, `expo-router` ~6.0.24, `react-native-reanimated` ~4.1.1, `react-native-gesture-handler` ~2.28.0, `react-native-worklets` 0.5.1, `expo-notifications` ~0.32.17, `expo-sqlite` ~16.0.10, `@expo/vector-icons` ^15.0.3):
+
+- React Native 0.81 → 0.86, React 19.1 → 19.2.
+- **expo-router decouples from React Navigation** (SDK 56) — codemod: `npx expo-codemod sdk-56-expo-router-react-navigation-replace`. Re-check `Stack.Protected` (onboarding guard) and every `router.push`/`useFocusEffect` call still behaves.
+- **Legacy Architecture removed entirely** (SDK 55) — a no-op here, this app already runs New Architecture (Expo's default since SDK 53; `app.json` never overrides it).
+- `expo-notifications`' Firebase dependency updated (SDK 55) — re-verify reminders still schedule and fire (`ADR-005`'s exact-alarm path) after the bump.
+- `react-native-reanimated` 4.1 → 4.5, `react-native-worklets` 0.5 → 0.10, `react-native-gesture-handler` 2.28 → 2.32 — no breaking changes documented, but re-verify the Today-row gesture composition (`Gesture.Race(swipe, Gesture.Exclusive(drag, tap))`) and every spring on a real device regardless.
+- `@expo/vector-icons` is being phased out in favor of `@react-native-vector-icons/*` (SDK 56) — this app uses it only as the Android fallback in `src/core/ui/icon.tsx`; swap when it actually breaks, not preemptively.
+
+Sequence once work starts: bump `expo`/run `npx expo install --check`, run the expo-router codemod, full native rebuild, then re-verify on the physical Android device — reminders (schedule + fire + deep link), Today's swipe/drag/tap gesture race, and the Sistema/Claro/Oscuro appearance toggle — before writing a single line of `@expo/ui`. Only after that passes: pilot `@expo/ui`'s universal `FieldGroup`/`Section`/`SectionHeader`/`SectionFooter` on the Settings screen only (per `docs/research/expo-ui.md`'s recommendation) — Today/Habits/Detail/Add-Edit keep their current hand-rolled components and shared motion system unchanged.
+
+---
+
 ## Non-negotiable rules
 
 1. **No comments in source code.** Not JSDoc, not `//` explanations. Only functional directives (`eslint-disable`, `@ts-expect-error`). Rationale belongs in `docs/`. If code needs a comment, rename or restructure instead.
