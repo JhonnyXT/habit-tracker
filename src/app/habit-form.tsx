@@ -86,6 +86,7 @@ export default function HabitFormScreen() {
   const [archived, setArchived] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [loaded, setLoaded] = useState(!id);
+  const [nameFocused, setNameFocused] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,12 +108,14 @@ export default function HabitFormScreen() {
 
     (async () => {
       const useCases = await getUseCases();
-      const detail = await useCases.getHabitDetail(id);
-      if (cancelled || !detail) {
+      const [habit, reminder] = await Promise.all([
+        useCases.getHabit(id),
+        useCases.getHabitReminder(id),
+      ]);
+      if (cancelled || !habit) {
         setLoaded(true);
         return;
       }
-      const { habit } = detail;
       setName(habit.name);
       setIcon(habit.icon);
       setColor(habit.color);
@@ -121,8 +124,7 @@ export default function HabitFormScreen() {
       if (habit.schedule.type === 'weekdays') setSelectedDays(habit.schedule.days);
       if (habit.schedule.type === 'timesPerWeek') setTimesPerWeek(habit.schedule.count);
 
-      const reminder = await useCases.getHabitReminder(id);
-      if (!cancelled && reminder) {
+      if (reminder) {
         setReminderEnabled(reminder.enabled);
         setReminderTime(timeFromClock(reminder.time));
       }
@@ -259,6 +261,8 @@ export default function HabitFormScreen() {
           <TextInput
             value={name}
             onChangeText={setName}
+            onFocus={() => setNameFocused(true)}
+            onBlur={() => setNameFocused(false)}
             placeholder={strings.form.namePlaceholder}
             placeholderTextColor={theme.colors.text.secondary}
             maxLength={MAX_HABIT_NAME_LENGTH}
@@ -271,6 +275,17 @@ export default function HabitFormScreen() {
               borderRadius: theme.radius.lg,
               paddingHorizontal: theme.spacing.md,
               minHeight: 52,
+              borderWidth: 2,
+              borderColor: nameFocused ? theme.colors.accent.default : 'transparent',
+              ...(nameFocused
+                ? {
+                    shadowColor: theme.colors.accent.default,
+                    shadowOpacity: theme.scheme === 'dark' ? 0.35 : 0.2,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 0 },
+                    elevation: 4,
+                  }
+                : null),
             }}
           />
         </Enter>
@@ -502,8 +517,7 @@ export default function HabitFormScreen() {
                     alignItems: 'center',
                     paddingHorizontal: theme.spacing.md,
                     minHeight: 52,
-                    borderTopWidth: 1,
-                    borderTopColor: theme.colors.border.default,
+                    backgroundColor: theme.colors.surface.elevated,
                   }}
                 >
                   <ThemedText variant="body" style={{ flex: 1 }}>
@@ -598,8 +612,11 @@ export default function HabitFormScreen() {
           paddingTop: theme.spacing.sm,
           paddingBottom: insets.bottom + theme.spacing.sm,
           backgroundColor: theme.colors.surface.primary,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border.default,
+          shadowColor: '#000',
+          shadowOpacity: theme.scheme === 'dark' ? 0.4 : 0.1,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          elevation: 8,
         }}
       >
         <Button

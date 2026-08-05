@@ -24,6 +24,7 @@ import { reorderHabitsUseCase } from '@/features/habits/domain/use-cases/reorder
 import { toggleCompletionUseCase } from '@/features/habits/domain/use-cases/toggle-completion';
 import { getTodayHabitsUseCase } from '@/features/habits/domain/use-cases/get-today-habits';
 import { getHabitsUseCase } from '@/features/habits/domain/use-cases/get-habits';
+import { getHabitUseCase } from '@/features/habits/domain/use-cases/get-habit';
 import { getHabitDetailUseCase } from '@/features/habits/domain/use-cases/get-habit-detail';
 import { SqliteReminderRepository } from '@/features/reminders/data/sqlite-reminder-repository';
 import { ExpoNotificationScheduler } from '@/features/reminders/data/expo-notification-scheduler';
@@ -55,6 +56,7 @@ async function build() {
     toggleCompletion: toggleCompletionUseCase(habits, completions),
     getTodayHabits: getTodayHabitsUseCase(habits, completions),
     getHabits: getHabitsUseCase(habits, completions),
+    getHabit: getHabitUseCase(habits),
     getHabitDetail: getHabitDetailUseCase(habits, completions),
 
     getHabitReminder: getHabitReminderUseCase(reminders),
