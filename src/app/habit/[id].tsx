@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Modal, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +17,8 @@ import {
   Icon,
   EmptyState,
   Enter,
+  ProgressBar,
+  CompletionCheck,
 } from '@/core/ui';
 import { getUseCases } from '@/core/di';
 import { useHabitsStore } from '@/features/habits/presentation/store';
@@ -26,6 +28,8 @@ import { MonthCalendar } from '@/features/habits/presentation/components/month-c
 import { startOfMonth } from '@/features/habits/domain/calendar';
 import { today as todayDate, type ISODate } from '@/features/habits/domain/date';
 import type { HabitDetail } from '@/features/habits/domain/use-cases/get-habit-detail';
+import type { HabitTasks } from '@/features/habits/domain/use-cases/get-habit-tasks';
+import { MAX_TASK_NAME_LENGTH } from '@/features/habits/domain/entities/task';
 
 const HISTORY_DAYS = 364;
 
@@ -35,14 +39,22 @@ export default function HabitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useAppTheme();
   const [detail, setDetail] = useState<HabitDetail | null>(null);
+  const [tasks, setTasks] = useState<HabitTasks | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState<HistoryView>('year');
   const [month, setMonth] = useState<ISODate>(() => startOfMonth(todayDate()));
+  const [addingTask, setAddingTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
   const toggle = useHabitsStore((state) => state.toggle);
 
   const load = useCallback(async () => {
     const useCases = await getUseCases();
-    setDetail(await useCases.getHabitDetail(id));
+    const [habitDetail, habitTasks] = await Promise.all([
+      useCases.getHabitDetail(id),
+      useCases.getHabitTasks(id),
+    ]);
+    setDetail(habitDetail);
+    setTasks(habitTasks);
     setLoaded(true);
   }, [id]);
 
@@ -120,6 +132,43 @@ export default function HabitDetailScreen() {
     await load();
   };
 
+  const onToggleTask = async (taskId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTasks((current) => {
+      if (!current) return current;
+      const task = current.tasks.find((entry) => entry.id === taskId);
+      if (!task) return current;
+
+      const completedToday = !task.completedToday;
+      return {
+        ...current,
+        tasks: current.tasks.map((entry) =>
+          entry.id === taskId ? { ...entry, completedToday } : entry,
+        ),
+        completedCount: current.completedCount + (completedToday ? 1 : -1),
+      };
+    });
+
+    const useCases = await getUseCases();
+    await useCases.toggleTaskCompletion(taskId);
+  };
+
+  const onAddTask = async () => {
+    const trimmed = newTaskName.trim();
+    if (trimmed.length === 0) return;
+
+    const useCases = await getUseCases();
+    const result = await useCases.createTask({ habitId: habit.id, name: trimmed });
+    if (!result.ok) return;
+
+    setNewTaskName('');
+    setAddingTask(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    const habitTasks = await useCases.getHabitTasks(habit.id);
+    setTasks(habitTasks);
+  };
+
   const onToggleDay = async (date: ISODate) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setDetail((current) =>
@@ -177,7 +226,81 @@ export default function HabitDetailScreen() {
           />
         </Enter>
 
-        <Enter index={2} style={{ gap: theme.spacing.sm }}>
+        {tasks ? (
+          <Enter index={2} style={{ gap: theme.spacing.sm }}>
+            {tasks.totalCount > 0 ? (
+              <>
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <ThemedText variant="headline">{strings.tasks.title}</ThemedText>
+                  <ThemedText variant="footnote" color="secondary">
+                    {strings.tasks.progress(tasks.completedCount, tasks.totalCount)}
+                  </ThemedText>
+                </View>
+
+                <ProgressBar value={tasks.completedCount / tasks.totalCount} />
+              </>
+            ) : null}
+
+            <Card padded={false}>
+              {tasks.tasks.map((task, index) => (
+                <PressableScale
+                  key={task.id}
+                  onPress={() => onToggleTask(task.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: task.completedToday }}
+                  accessibilityLabel={strings.a11y.toggleTask(task.name)}
+                  activeScale={0.99}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.md,
+                    paddingHorizontal: theme.spacing.md,
+                    minHeight: 52,
+                    borderTopWidth: index === 0 ? 0 : 1,
+                    borderTopColor: theme.colors.border.default,
+                  }}
+                >
+                  <CompletionCheck completed={task.completedToday} color={habit.color} size={22} />
+                  <ThemedText
+                    variant="body"
+                    style={{
+                      flex: 1,
+                      opacity: task.completedToday ? 0.5 : 1,
+                      textDecorationLine: task.completedToday ? 'line-through' : 'none',
+                    }}
+                  >
+                    {task.name}
+                  </ThemedText>
+                </PressableScale>
+              ))}
+
+              <PressableScale
+                onPress={() => setAddingTask(true)}
+                accessibilityRole="button"
+                accessibilityLabel={strings.a11y.addTask}
+                activeScale={0.99}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.md,
+                  minHeight: 52,
+                  borderTopWidth: tasks.tasks.length === 0 ? 0 : 1,
+                  borderTopColor: theme.colors.border.default,
+                }}
+              >
+                <Icon name="add" size={16} color={theme.colors.accent.default} />
+                <ThemedText variant="body" style={{ color: theme.colors.accent.default }}>
+                  {strings.tasks.add}
+                </ThemedText>
+              </PressableScale>
+            </Card>
+          </Enter>
+        ) : null}
+
+        <Enter index={3} style={{ gap: theme.spacing.sm }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <ThemedText variant="headline">{strings.detail.history}</ThemedText>
             <ThemedText variant="footnote" color="secondary">
@@ -216,7 +339,7 @@ export default function HabitDetailScreen() {
           </Card>
         </Enter>
 
-        <Enter index={3}>
+        <Enter index={4}>
           <Button
             label={completedToday ? strings.detail.undo : strings.detail.markDone}
             icon={completedToday ? 'undo' : 'checkCircle'}
@@ -226,6 +349,75 @@ export default function HabitDetailScreen() {
           />
         </Enter>
       </ScrollView>
+
+      <Modal
+        visible={addingTask}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAddingTask(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: theme.colors.surface.scrim,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: theme.spacing.lg,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 340,
+              borderRadius: theme.radius.xl,
+              backgroundColor: theme.colors.surface.secondary,
+              padding: theme.spacing.lg,
+              gap: theme.spacing.md,
+            }}
+          >
+            <ThemedText variant="title">{strings.tasks.newTitle}</ThemedText>
+            <TextInput
+              value={newTaskName}
+              onChangeText={setNewTaskName}
+              placeholder={strings.tasks.namePlaceholder}
+              placeholderTextColor={theme.colors.text.secondary}
+              maxLength={MAX_TASK_NAME_LENGTH}
+              accessibilityLabel={strings.a11y.taskName}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={onAddTask}
+              style={{
+                ...theme.typography.body,
+                color: theme.colors.text.primary,
+                backgroundColor: theme.colors.surface.elevated,
+                borderRadius: theme.radius.lg,
+                paddingHorizontal: theme.spacing.md,
+                minHeight: 52,
+              }}
+            />
+            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label={strings.tasks.cancel}
+                  variant="secondary"
+                  onPress={() => {
+                    setAddingTask(false);
+                    setNewTaskName('');
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label={strings.tasks.create}
+                  onPress={onAddTask}
+                  disabled={newTaskName.trim().length === 0}
+                  tint={theme.colors.habit[habit.color].solid}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

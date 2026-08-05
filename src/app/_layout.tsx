@@ -83,7 +83,15 @@ export default function RootLayout() {
           <Stack.Protected guard={!pending}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="habit/[id]" />
-            <Stack.Screen name="habit-form" options={{ presentation: 'modal' }} />
+            <Stack.Screen
+              name="habit-form"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.9],
+                sheetGrabberVisible: true,
+                sheetCornerRadius: theme.radius.xl,
+              }}
+            />
           </Stack.Protected>
         </Stack>
       ) : (
