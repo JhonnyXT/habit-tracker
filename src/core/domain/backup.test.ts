@@ -45,6 +45,11 @@ const task: Task = {
   name: 'Estirar',
   sortOrder: 0,
   archived: false,
+  color: null,
+  urgent: false,
+  pinned: false,
+  deadline: null,
+  notes: null,
   createdAt: new Date('2026-07-01T08:00:00.000Z'),
   updatedAt: new Date('2026-07-01T08:00:00.000Z'),
 };

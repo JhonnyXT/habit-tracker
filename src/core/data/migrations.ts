@@ -91,6 +91,32 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 5,
+    up: async (db) => {
+      await db.execAsync(`
+        ALTER TABLE tasks ADD COLUMN color TEXT;
+        ALTER TABLE tasks ADD COLUMN urgent INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE tasks ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+      `);
+    },
+  },
+  {
+    version: 6,
+    up: async (db) => {
+      await db.execAsync(`
+        ALTER TABLE tasks ADD COLUMN deadline TEXT;
+      `);
+    },
+  },
+  {
+    version: 7,
+    up: async (db) => {
+      await db.execAsync(`
+        ALTER TABLE tasks ADD COLUMN notes TEXT;
+      `);
+    },
+  },
 ];
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {

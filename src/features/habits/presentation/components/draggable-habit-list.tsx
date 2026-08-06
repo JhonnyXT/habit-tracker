@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedReaction,
   withSpring,
   withTiming,
+  withDelay,
   runOnJS,
   useReducedMotion,
   type SharedValue,
@@ -14,7 +15,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/core/theme';
-import { spring as springTokens, pressScale } from '@/core/theme/motion';
+import { spring as springTokens, pressScale, duration as durationTokens } from '@/core/theme/motion';
 import { strings } from '@/core/i18n';
 import { Icon } from '@/core/ui';
 import {
@@ -58,12 +59,20 @@ type DraggableRowProps = {
   openId: SharedValue<string | null>;
   onTap: () => void;
   onCommit: () => void;
+  onDragStart: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   accessibilityLabel: string;
   checked: boolean;
   role: 'checkbox' | 'button';
+  accessibleRow: boolean;
   children: React.ReactNode;
+
+  expandedIdSV: SharedValue<string | null>;
+  expandedPosSV: SharedValue<number>;
+  extraHeightSV: SharedValue<number>;
+  contentVisible: boolean;
+  renderExpanded?: () => React.ReactNode;
 };
 
 function DraggableRow({
@@ -75,12 +84,19 @@ function DraggableRow({
   openId,
   onTap,
   onCommit,
+  onDragStart,
   onEdit,
   onDelete,
   accessibilityLabel,
   checked,
   role,
+  accessibleRow,
   children,
+  expandedIdSV,
+  expandedPosSV,
+  extraHeightSV,
+  contentVisible,
+  renderExpanded,
 }: DraggableRowProps) {
   const theme = useAppTheme();
   const reducedMotion = useReducedMotion();
@@ -113,10 +129,16 @@ function DraggableRow({
   );
 
   useAnimatedReaction(
-    () => positions.value[id],
+    () => ({
+      pos: positions.value[id],
+      expandedPos: expandedPosSV.value,
+      extra: extraHeightSV.value,
+    }),
     (current, previous) => {
-      if (current === undefined || current === previous || isActive.value) return;
-      top.value = withSpring(current * slot, springTokens.default);
+      if (current.pos === undefined || isActive.value) return;
+      if (previous && current.pos === previous.pos && current.extra === previous.extra) return;
+      const shift = current.expandedPos !== -1 && current.pos > current.expandedPos ? current.extra : 0;
+      top.value = withSpring(current.pos * slot + shift, springTokens.default);
     },
   );
 
@@ -141,6 +163,7 @@ function DraggableRow({
       startTop.value = top.value;
 
       runOnJS(impact)();
+      runOnJS(onDragStart)();
     })
     .onUpdate((event) => {
       top.value = startTop.value + event.translationY;
@@ -205,11 +228,14 @@ function DraggableRow({
   const style = useAnimatedStyle(() => {
     const lift = isActive.value ? 1 : 0;
     const restingScale = isPressed.value ? pressScale : 1;
+    const isExpandedRow = expandedIdSV.value === id;
     return {
       position: 'absolute',
       left: 0,
       right: 0,
       top: top.value,
+      height: isExpandedRow ? slot + extraHeightSV.value : slot,
+      overflow: 'hidden',
       zIndex: isActive.value ? 10 : 0,
       transform: [
         {
@@ -228,7 +254,6 @@ function DraggableRow({
 
   const slideStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: offsetX.value }],
-    backgroundColor: swipeable ? theme.colors.surface.secondary : 'transparent',
   }));
 
   const actionsStyle = useAnimatedStyle(() => ({
@@ -244,6 +269,14 @@ function DraggableRow({
     const progress = clamp(-offsetX.value / ACTION_WIDTH, 0, 1);
     return { opacity: progress, transform: [{ scale: 0.7 + progress * 0.3 }] };
   });
+
+  const onExpandedLayout = (event: { nativeEvent: { layout: { height: number } } }) => {
+    if (expandedIdSV.value !== id) return;
+    const nextHeight = event.nativeEvent.layout.height;
+    const spring = withSpring(nextHeight, springTokens.snappy);
+    extraHeightSV.value =
+      nextHeight < extraHeightSV.value ? withDelay(durationTokens.listItemExit, spring) : spring;
+  };
 
   return (
     <GestureDetector gesture={gesture}>
@@ -297,7 +330,7 @@ function DraggableRow({
               width: ACTION_WIDTH,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: theme.colors.surface.secondary,
+              backgroundColor: theme.colors.state.dangerSubtle,
             }}
           >
             <Animated.View
@@ -320,16 +353,18 @@ function DraggableRow({
         ) : null}
 
         <Animated.View
-          accessible
-          accessibilityRole={role}
-          accessibilityState={role === 'checkbox' ? { checked } : undefined}
-          accessibilityLabel={accessibilityLabel}
+          accessible={accessibleRow}
+          accessibilityRole={accessibleRow ? role : undefined}
+          accessibilityState={accessibleRow && role === 'checkbox' ? { checked } : undefined}
+          accessibilityLabel={accessibleRow ? accessibilityLabel : undefined}
           accessibilityHint={
-            role === 'button'
-              ? 'Double tap to open. Touch and hold to reorder.'
-              : checked
-                ? 'Double tap to mark as not done. Touch and hold to reorder.'
-                : 'Double tap to mark as done. Touch and hold to reorder.'
+            !accessibleRow
+              ? undefined
+              : role === 'button'
+                ? 'Double tap to open. Touch and hold to reorder.'
+                : checked
+                  ? 'Double tap to mark as not done. Touch and hold to reorder.'
+                  : 'Double tap to mark as done. Touch and hold to reorder.'
           }
           accessibilityActions={
             swipeable
@@ -346,6 +381,9 @@ function DraggableRow({
           style={slideStyle}
         >
           {children}
+          {contentVisible && renderExpanded ? (
+            <View onLayout={onExpandedLayout}>{renderExpanded()}</View>
+          ) : null}
         </Animated.View>
       </Animated.View>
     </GestureDetector>
@@ -355,7 +393,7 @@ function DraggableRow({
 type DraggableHabitListProps<T> = {
   items: T[];
   keyExtractor: (item: T) => string;
-  renderItem: (item: T) => React.ReactNode;
+  renderItem: (item: T, state: { expanded: boolean }) => React.ReactNode;
 
   accessibilityLabelFor: (item: T) => string;
   isChecked: (item: T) => boolean;
@@ -366,6 +404,9 @@ type DraggableHabitListProps<T> = {
   onDelete?: (id: string) => void;
   slot?: number;
   separators?: boolean;
+
+  canExpand?: (item: T) => boolean;
+  renderExpanded?: (item: T) => React.ReactNode;
 };
 
 export function DraggableHabitList<T>({
@@ -381,10 +422,18 @@ export function DraggableHabitList<T>({
   slot = HABIT_ROW_HEIGHT,
   separators = true,
   rowRole = 'checkbox',
+  canExpand,
+  renderExpanded,
 }: DraggableHabitListProps<T>) {
   const ids = useMemo(() => items.map(keyExtractor), [items, keyExtractor]);
   const positions = useSharedValue<Positions>({});
   const openId = useSharedValue<string | null>(null);
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [contentId, setContentId] = useState<string | null>(null);
+  const expandedIdSV = useSharedValue<string | null>(null);
+  const expandedPosSV = useSharedValue(-1);
+  const extraHeightSV = useSharedValue(0);
 
   const idKey = ids.join('|');
   useEffect(() => {
@@ -405,10 +454,40 @@ export function DraggableHabitList<T>({
     if (ordered.length > 0) onReorder(ordered);
   }, [positions, onReorder]);
 
+  const collapse = useCallback(() => {
+    setExpandedId(null);
+    expandedIdSV.value = null;
+    expandedPosSV.value = -1;
+    extraHeightSV.value = withSpring(0, springTokens.snappy, (finished) => {
+      if (finished) runOnJS(setContentId)(null);
+    });
+  }, [expandedIdSV, expandedPosSV, extraHeightSV]);
+
+  const onToggleExpand = useCallback(
+    (id: string) => {
+      if (expandedId === id) {
+        collapse();
+        return;
+      }
+      setExpandedId(id);
+      setContentId(id);
+      expandedIdSV.value = id;
+      expandedPosSV.value = positions.value[id] ?? -1;
+      extraHeightSV.value = 0;
+    },
+    [expandedId, collapse, expandedIdSV, expandedPosSV, extraHeightSV, positions],
+  );
+
+  const containerStyle = useAnimatedStyle(() => ({
+    height: items.length * slot + extraHeightSV.value,
+  }));
+
   return (
-    <View style={{ height: items.length * slot, overflow: 'hidden' }}>
+    <Animated.View style={containerStyle}>
       {items.map((item, index) => {
         const id = keyExtractor(item);
+        const itemCanExpand = (canExpand?.(item) ?? false) || expandedId === id;
+        const accessibleRow = canExpand ? itemCanExpand : true;
         return (
           <DraggableRow
             key={id}
@@ -418,34 +497,68 @@ export function DraggableHabitList<T>({
             count={items.length}
             slot={slot}
             openId={openId}
-            onTap={() => onToggle(id)}
+            onTap={() => (itemCanExpand ? onToggleExpand(id) : onToggle(id))}
             onCommit={commit}
+            onDragStart={collapse}
             onEdit={onEdit ? () => onEdit(id) : undefined}
             onDelete={onDelete ? () => onDelete(id) : undefined}
             accessibilityLabel={accessibilityLabelFor(item)}
             checked={isChecked(item)}
-            role={rowRole}
+            role={itemCanExpand ? 'button' : rowRole}
+            accessibleRow={accessibleRow}
+            expandedIdSV={expandedIdSV}
+            expandedPosSV={expandedPosSV}
+            extraHeightSV={extraHeightSV}
+            contentVisible={contentId === id}
+            renderExpanded={renderExpanded ? () => renderExpanded(item) : undefined}
           >
-            {renderItem(item)}
+            {renderItem(item, { expanded: expandedId === id })}
           </DraggableRow>
         );
       })}
 
       {(separators ? items.slice(1) : []).map((item, index) => (
-        <View
+        <Separator
           key={`separator-${keyExtractor(item)}`}
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: (index + 1) * slot,
-            left: HABIT_ROW_SEPARATOR_INSET,
-            right: 0,
-            height: 1,
-            backgroundColor: theme.colors.border.default,
-            opacity: 0.5,
-          }}
+          slotIndex={index + 1}
+          slot={slot}
+          expandedPosSV={expandedPosSV}
+          extraHeightSV={extraHeightSV}
+          color={theme.colors.border.default}
         />
       ))}
-    </View>
+    </Animated.View>
+  );
+}
+
+type SeparatorProps = {
+  slotIndex: number;
+  slot: number;
+  expandedPosSV: SharedValue<number>;
+  extraHeightSV: SharedValue<number>;
+  color: string;
+};
+
+function Separator({ slotIndex, slot, expandedPosSV, extraHeightSV, color }: SeparatorProps) {
+  const style = useAnimatedStyle(() => {
+    const shift = expandedPosSV.value !== -1 && slotIndex > expandedPosSV.value ? extraHeightSV.value : 0;
+    return { top: slotIndex * slot + shift };
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: 'absolute',
+          left: HABIT_ROW_SEPARATOR_INSET,
+          right: 0,
+          height: 1,
+          backgroundColor: color,
+          opacity: 0.5,
+        },
+        style,
+      ]}
+    />
   );
 }

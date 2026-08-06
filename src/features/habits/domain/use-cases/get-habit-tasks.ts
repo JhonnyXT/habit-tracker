@@ -3,6 +3,7 @@ import type {
   TaskRepository,
   TaskCompletionRepository,
 } from '@/features/habits/domain/repositories/task-repository';
+import { compareTasks } from '@/features/habits/domain/task-order';
 import { today as todayDate, type ISODate } from '@/features/habits/domain/date';
 
 export type TaskWithState = Task & { completedToday: boolean };
@@ -22,10 +23,12 @@ export function getHabitTasksUseCase(tasks: TaskRepository, taskCompletions: Tas
         .map((completion) => completion.taskId),
     );
 
-    const withState = habitTasks.map((task) => ({
-      ...task,
-      completedToday: completedToday.has(task.id),
-    }));
+    const withState = habitTasks
+      .map((task) => ({
+        ...task,
+        completedToday: completedToday.has(task.id),
+      }))
+      .sort(compareTasks);
 
     return {
       tasks: withState,

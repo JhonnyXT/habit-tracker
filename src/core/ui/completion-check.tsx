@@ -42,8 +42,8 @@ export function CompletionCheck({ completed, color, size = 26 }: CompletionCheck
         width: size,
         height: size,
         borderRadius: theme.radius.full,
-        borderWidth: 1.5,
-        borderColor: theme.colors.border.default,
+        borderWidth: 2,
+        borderColor: completed ? theme.colors.habit[color].solid : theme.colors.text.secondary,
         alignItems: 'center',
         justifyContent: 'center',
       }}

@@ -12,7 +12,7 @@ import { getDatabase } from '@/core/data';
 import { getUseCases } from '@/core/di';
 import { useAppTheme } from '@/core/theme';
 import { useAppearanceStore } from '@/core/theme/appearance-store';
-import { ThemedView } from '@/core/ui';
+import { ThemedView, SuccessOverlay } from '@/core/ui';
 import { useOnboardingStore } from '@/features/onboarding/presentation/store';
 import { useReminderNavigation } from '@/features/reminders/presentation/use-reminder-navigation';
 
@@ -97,6 +97,7 @@ export default function RootLayout() {
       ) : (
         <ThemedView style={{ flex: 1 }} />
       )}
+      <SuccessOverlay />
     </GestureHandlerRootView>
   );
 }

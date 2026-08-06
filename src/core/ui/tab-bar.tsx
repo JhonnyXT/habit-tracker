@@ -4,10 +4,12 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 
 import { useAppTheme } from '@/core/theme';
+import { strings } from '@/core/i18n';
 import { Icon } from '@/core/ui/icon';
 import type { IconName } from '@/core/ui/icons';
 import { PressableScale } from '@/core/ui/pressable-scale';
 import { ThemedText } from '@/core/ui/themed-text';
+import { useCreateSheetStore } from '@/features/habits/presentation/create-sheet-store';
 
 const tabIcons: Record<string, IconName> = {
   index: 'checkCircle',
@@ -17,18 +19,17 @@ const tabIcons: Record<string, IconName> = {
 
 export const TAB_BAR_HEIGHT = 60;
 
-// Today has a "+" FAB floating to the right of the tab bar (see
-// (tabs)/index.tsx). Reserving this much width on that side keeps the
-// [tab bar + FAB] group centered as one unit on that screen, instead of the
-// tab bar centering itself across the full width and reading as off-center
-// once the FAB's extra footprint is added next to it.
-const FAB_RESERVED_WIDTH = 80;
+// Today also shows a "+" FAB to add a habit. It's rendered here, as part of
+// the same centered row as the tab pill, so the [pill + FAB] group is one
+// flex-centered unit on the full screen width instead of two separately
+// positioned elements that have to be reconciled by hand.
 const screensWithFab = new Set(['index']);
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
-  const reserveForFab = screensWithFab.has(state.routeNames[state.index]);
+  const openCreateSheet = useCreateSheetStore((store) => store.open);
+  const showFab = screensWithFab.has(state.routeNames[state.index]);
 
   return (
     <View
@@ -36,9 +37,12 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       style={{
         position: 'absolute',
         left: 0,
-        right: reserveForFab ? FAB_RESERVED_WIDTH : 0,
+        right: 0,
         bottom: insets.bottom + theme.spacing.sm,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: theme.spacing.sm,
       }}
     >
       <View
@@ -95,6 +99,29 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           );
         })}
       </View>
+
+      {showFab ? (
+        <PressableScale
+          onPress={openCreateSheet}
+          accessibilityRole="button"
+          accessibilityLabel={strings.a11y.addHabit}
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: theme.radius.full,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.colors.surface.secondary,
+            shadowColor: theme.scheme === 'dark' ? '#000' : theme.colors.text.primary,
+            shadowOpacity: theme.scheme === 'dark' ? 0.25 : 0.1,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 6 },
+            elevation: 6,
+          }}
+        >
+          <Icon name="add" size={24} color={theme.colors.accent.default} />
+        </PressableScale>
+      ) : null}
     </View>
   );
 }

@@ -4,6 +4,7 @@ import type { ISODate } from '@/features/habits/domain/date';
 export interface TaskRepository {
   getForHabit(habitId: string, includeArchived?: boolean): Promise<Task[]>;
   getAll(includeArchived?: boolean): Promise<Task[]>;
+  getById(id: string): Promise<Task | null>;
   upsert(task: Task): Promise<void>;
   delete(id: string): Promise<void>;
 

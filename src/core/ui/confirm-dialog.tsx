@@ -1,13 +1,14 @@
 import { Modal, Pressable, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 
-import { useAppTheme, spring } from '@/core/theme';
+import { useAppTheme } from '@/core/theme';
 import type { HabitColorToken } from '@/core/theme';
 import { Button } from '@/core/ui/button';
 import { IconWell } from '@/core/ui/icon-well';
 import type { IconName } from '@/core/ui/icons';
 import { PressableScale } from '@/core/ui/pressable-scale';
 import { ThemedText } from '@/core/ui/themed-text';
+import { useModalProgress } from '@/core/ui/use-modal-progress';
 
 type ConfirmDialogProps = {
   visible: boolean;
@@ -35,19 +36,27 @@ export function ConfirmDialog({
   destructive = false,
 }: ConfirmDialogProps) {
   const theme = useAppTheme();
+  const { shouldRender, progress } = useModalProgress(visible);
+
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scale: interpolate(progress.value, [0, 1], [0.92, 1]) }],
+  }));
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onDismiss}>
+    <Modal visible={shouldRender} transparent animationType="none" onRequestClose={onDismiss}>
       <Animated.View
-        entering={FadeIn.duration(theme.motion.duration.fast)}
-        exiting={FadeOut.duration(theme.motion.duration.fast)}
-        style={{
-          flex: 1,
-          backgroundColor: theme.colors.surface.scrim,
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: theme.spacing.lg,
-        }}
+        style={[
+          {
+            flex: 1,
+            backgroundColor: theme.colors.surface.scrim,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: theme.spacing.lg,
+          },
+          scrimStyle,
+        ]}
       >
         <Pressable
           style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
@@ -57,20 +66,20 @@ export function ConfirmDialog({
         />
 
         <Animated.View
-          entering={ZoomIn.springify()
-            .dampingRatio(spring.sheet.dampingRatio)
-            .duration(spring.sheet.duration)}
           accessibilityViewIsModal
           accessibilityRole="alert"
-          style={{
-            width: '100%',
-            maxWidth: 340,
-            borderRadius: theme.radius.xl,
-            backgroundColor: theme.colors.surface.secondary,
-            padding: theme.spacing.lg,
-            gap: theme.spacing.md,
-            alignItems: 'center',
-          }}
+          style={[
+            {
+              width: '100%',
+              maxWidth: 340,
+              borderRadius: theme.radius.xl,
+              backgroundColor: theme.colors.surface.secondary,
+              padding: theme.spacing.lg,
+              gap: theme.spacing.md,
+              alignItems: 'center',
+            },
+            cardStyle,
+          ]}
         >
           {icon ? <IconWell name={icon} color={iconColor} size={56} /> : null}
 

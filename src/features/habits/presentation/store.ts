@@ -5,6 +5,8 @@ import type { TodayHabit } from '@/features/habits/domain/use-cases/get-today-ha
 import type { HabitSummary } from '@/features/habits/domain/use-cases/get-habits';
 import type { CreateHabitInput } from '@/features/habits/domain/use-cases/create-habit';
 import type { EditHabitInput } from '@/features/habits/domain/use-cases/edit-habit';
+import type { CreateTaskInput } from '@/features/habits/domain/use-cases/create-task';
+import type { EditTaskUpdates } from '@/features/habits/domain/use-cases/edit-task';
 import type { ISODate } from '@/features/habits/domain/date';
 
 type HabitsState = {
@@ -17,6 +19,15 @@ type HabitsState = {
   loadToday: () => Promise<void>;
   loadHabits: () => Promise<void>;
   toggle: (habitId: string, date?: ISODate) => Promise<void>;
+  toggleTask: (taskId: string) => Promise<void>;
+  createTask: (input: CreateTaskInput) => Promise<boolean>;
+  deleteTask: (taskId: string) => Promise<void>;
+  editTask: (
+    habitId: string,
+    taskId: string,
+    name: string,
+    updates?: EditTaskUpdates,
+  ) => Promise<boolean>;
   create: (input: CreateHabitInput) => Promise<string | null>;
   edit: (id: string, changes: EditHabitInput) => Promise<boolean>;
   archive: (id: string, archived?: boolean) => Promise<void>;
@@ -75,6 +86,79 @@ export const useHabitsStore = create<HabitsState>((set, get) => ({
           : entry,
       ),
     });
+  },
+
+  toggleTask: async (taskId) => {
+    const before = get().today;
+    const patchTask = (entries: TodayHabit[], completedToday: boolean) =>
+      entries.map((entry) => {
+        if (!entry.tasks.some((task) => task.id === taskId)) return entry;
+        const tasks = entry.tasks.map((task) =>
+          task.id === taskId ? { ...task, completedToday } : task,
+        );
+        const taskProgress = entry.taskProgress
+          ? {
+              ...entry.taskProgress,
+              completedCount: tasks.filter((task) => task.completedToday).length,
+            }
+          : entry.taskProgress;
+        return { ...entry, tasks, taskProgress };
+      });
+
+    const optimisticNext = before.find((entry) => entry.tasks.some((task) => task.id === taskId))
+      ?.tasks.find((task) => task.id === taskId);
+    set({ today: patchTask(before, !(optimisticNext?.completedToday ?? false)) });
+
+    const useCases = await getUseCases();
+    const result = await useCases.toggleTaskCompletion(taskId);
+
+    if (!result.ok) {
+      set({ today: before });
+      return;
+    }
+
+    if (result.habitCompletedByTasks) {
+      await get().loadToday();
+      return;
+    }
+
+    set({ today: patchTask(get().today, result.completed) });
+  },
+
+  createTask: async (input) => {
+    const useCases = await getUseCases();
+    const result = await useCases.createTask(input);
+    if (!result.ok) return false;
+    await get().loadToday();
+    return true;
+  },
+
+  deleteTask: async (taskId) => {
+    const useCases = await getUseCases();
+    await useCases.deleteTask(taskId);
+
+    set({
+      today: get().today.map((entry) => {
+        if (!entry.tasks.some((task) => task.id === taskId)) return entry;
+        const tasks = entry.tasks.filter((task) => task.id !== taskId);
+        const taskProgress = entry.taskProgress
+          ? {
+              ...entry.taskProgress,
+              totalCount: tasks.length,
+              completedCount: tasks.filter((task) => task.completedToday).length,
+            }
+          : entry.taskProgress;
+        return { ...entry, tasks, taskProgress };
+      }),
+    });
+  },
+
+  editTask: async (habitId, taskId, name, updates) => {
+    const useCases = await getUseCases();
+    const result = await useCases.editTask(habitId, taskId, name, updates);
+    if (!result.ok) return false;
+    await get().loadToday();
+    return true;
   },
 
   create: async (input) => {

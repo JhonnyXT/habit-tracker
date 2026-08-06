@@ -6,6 +6,7 @@ import type { HabitRepository } from '@/features/habits/domain/repositories/habi
 import type { NotificationScheduler } from '@/features/reminders/domain/notification-scheduler';
 import type { ReminderRepository } from '@/features/reminders/domain/repositories/reminder-repository';
 import { daysFor } from '@/features/reminders/domain/use-cases/set-habit-reminder';
+import { capitalize } from '@/features/habits/domain/text';
 
 export type EditHabitInput = {
   name?: string;
@@ -29,7 +30,7 @@ export function editHabitUseCase(
 
     let name = existing.name;
     if (changes.name !== undefined) {
-      name = changes.name.trim();
+      name = capitalize(changes.name.trim());
       if (name.length === 0) return { ok: false, error: 'empty-name' };
       if (name.length > MAX_HABIT_NAME_LENGTH) return { ok: false, error: 'name-too-long' };
     }

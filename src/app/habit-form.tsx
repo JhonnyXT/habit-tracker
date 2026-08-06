@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, Platform, ScrollView, TextInput, Switch, View } from 'react-native';
+import { Linking, ScrollView, TextInput, Switch, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -20,19 +19,14 @@ import {
   Chip,
   Enter,
   ConfirmDialog,
+  TimePickerModal,
   type IconName,
 } from '@/core/ui';
 import { getUseCases } from '@/core/di';
 import { ColorSwatch } from '@/features/habits/presentation/components/color-swatch';
 import { useHabitsStore } from '@/features/habits/presentation/store';
 import { describeSchedule } from '@/features/habits/presentation/format';
-import {
-  MAX_HABIT_NAME_LENGTH,
-  weekdays,
-  type Schedule,
-  type Weekday,
-} from '@/features/habits/domain/entities/habit';
-import { MAX_TASK_NAME_LENGTH } from '@/features/habits/domain/entities/task';
+import { MAX_HABIT_NAME_LENGTH, weekdays, type Schedule, type Weekday } from '@/features/habits/domain/entities/habit';
 import {
   DEFAULT_REMINDER_TIME,
   parseClockTime,
@@ -66,22 +60,24 @@ function timeFromClock(time: ClockTime): Date {
   return date;
 }
 
+const time12hFormatter = new Intl.DateTimeFormat('es', {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+function formatTime12h(date: Date): string {
+  return time12hFormatter.format(date);
+}
+
 export default function HabitFormScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
-  const isEditing = Boolean(id);
 
-  const create = useHabitsStore((state) => state.create);
   const edit = useHabitsStore((state) => state.edit);
   const remove = useHabitsStore((state) => state.remove);
   const archive = useHabitsStore((state) => state.archive);
-  const habitsList = useHabitsStore((state) => state.habits);
-
-  const [mode, setMode] = useState<'habit' | 'task'>('habit');
-  const [taskName, setTaskName] = useState('');
-  const [taskNameFocused, setTaskNameFocused] = useState(false);
-  const [taskHabitId, setTaskHabitId] = useState<string | null>(null);
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [name, setName] = useState('');
@@ -97,7 +93,7 @@ export default function HabitFormScreen() {
   const [permission, setPermission] = useState<NotificationPermission>('undetermined');
   const [archived, setArchived] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-  const [loaded, setLoaded] = useState(!id);
+  const [loaded, setLoaded] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
   const [activeReveal, setActiveReveal] = useState<RevealSection | null>(null);
 
@@ -119,7 +115,6 @@ export default function HabitFormScreen() {
   }, []);
 
   useEffect(() => {
-    if (!id) return;
     let cancelled = false;
 
     (async () => {
@@ -183,32 +178,15 @@ export default function HabitFormScreen() {
   }, [scheduleType, selectedDays, timesPerWeek]);
 
   const schedule = buildSchedule();
-  const canSaveHabit =
-    name.trim().length > 0 && !(scheduleType === 'weekdays' && selectedDays.length === 0);
-  const canSaveTask = taskName.trim().length > 0 && taskHabitId !== null;
-  const canSave = mode === 'task' ? canSaveTask : canSaveHabit;
+  const canSave = name.trim().length > 0 && !(scheduleType === 'weekdays' && selectedDays.length === 0);
 
   const onSave = async () => {
-    if (mode === 'task') {
-      if (!taskHabitId) return;
-      const useCases = await getUseCases();
-      const result = await useCases.createTask({ habitId: taskHabitId, name: taskName });
-      if (!result.ok) return;
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-      return;
-    }
-
-    const habitId = isEditing
-      ? (await edit(id!, { name, icon, color, schedule })) && id!
-      : await create({ name, icon, color, schedule });
-
-    if (!habitId) return;
+    const ok = await edit(id, { name, icon, color, schedule });
+    if (!ok) return;
 
     const useCases = await getUseCases();
     await useCases.setHabitReminder({
-      habitId,
+      habitId: id,
       enabled: reminderEnabled,
       time: toClockTime(reminderTime),
       preEnabled: preReminderEnabled,
@@ -221,25 +199,19 @@ export default function HabitFormScreen() {
 
   const onArchive = async () => {
     Haptics.selectionAsync();
-    await archive(id!, !archived);
+    await archive(id, !archived);
     router.back();
   };
 
   const onDelete = async () => {
     setConfirmingDelete(false);
-    await remove(id!);
+    await remove(id);
     router.dismissAll();
   };
 
   if (!loaded) {
     return <View style={{ flex: 1, backgroundColor: theme.colors.surface.primary }} />;
   }
-
-  const title = isEditing
-    ? strings.form.editTitle
-    : mode === 'task'
-      ? strings.form.taskNewTitle
-      : strings.form.newTitle;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.surface.primary }} edges={['top']}>
@@ -257,7 +229,7 @@ export default function HabitFormScreen() {
       >
         <Enter index={0} style={{ flexDirection: 'row', alignItems: 'center' }}>
           <ThemedText variant="largeTitle" style={{ flex: 1 }}>
-            {title}
+            {strings.form.editTitle}
           </ThemedText>
           <PressableScale
             onPress={() => router.back()}
@@ -276,400 +248,347 @@ export default function HabitFormScreen() {
           </PressableScale>
         </Enter>
 
-        {!isEditing ? (
-          <Enter index={1} lift={false} style={{ gap: theme.spacing.xs }}>
-            <SegmentedControl
-              accessibilityLabel={strings.a11y.creationMode}
-              value={mode}
-              onChange={(next) => {
-                if (next === 'task' && habitsList.length === 0) return;
-                Haptics.selectionAsync();
-                setMode(next);
-              }}
-              options={[
-                { value: 'habit', label: strings.form.modeHabit },
-                { value: 'task', label: strings.form.modeTask },
-              ]}
+        <Enter index={2} lift={false}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.md,
+              padding: theme.spacing.md,
+              borderRadius: theme.radius.lg,
+              backgroundColor: theme.colors.surface.secondary,
+            }}
+          >
+            <IconWell name={icon} color={color} size={44} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <ThemedText variant="headline" numberOfLines={1}>
+                {name.trim() || strings.form.previewName}
+              </ThemedText>
+              <ThemedText variant="footnote" style={{ color: theme.colors.text.accent }}>
+                {describeSchedule(schedule)}
+              </ThemedText>
+            </View>
+            <CompletionCheck completed={false} color={color} />
+          </View>
+        </Enter>
+
+        <Enter index={3} style={{ gap: theme.spacing.sm }}>
+          <ThemedText variant="sectionHeader" color="secondary">
+            {strings.form.name.toUpperCase()}
+          </ThemedText>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            onFocus={() => setNameFocused(true)}
+            onBlur={() => setNameFocused(false)}
+            placeholder={strings.form.namePlaceholder}
+            placeholderTextColor={theme.colors.text.secondary}
+            maxLength={MAX_HABIT_NAME_LENGTH}
+            accessibilityLabel={strings.a11y.habitName}
+            returnKeyType="done"
+            style={{
+              ...theme.typography.body,
+              color: theme.colors.text.primary,
+              backgroundColor: theme.colors.surface.secondary,
+              borderRadius: theme.radius.lg,
+              paddingHorizontal: theme.spacing.md,
+              minHeight: 52,
+              borderWidth: 2,
+              borderColor: nameFocused ? theme.colors.accent.default : 'transparent',
+              ...(nameFocused
+                ? {
+                    shadowColor: theme.colors.accent.default,
+                    shadowOpacity: theme.scheme === 'dark' ? 0.35 : 0.2,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 0 },
+                    elevation: 4,
+                  }
+                : null),
+            }}
+          />
+        </Enter>
+
+        <Enter index={4} style={{ gap: theme.spacing.sm }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            <Chip
+              label={strings.form.icon}
+              icon={icon}
+              selected={activeReveal === 'icon'}
+              onPress={() => toggleReveal('icon')}
             />
-            {habitsList.length === 0 ? (
-              <ThemedText variant="footnote" color="secondary">
-                {strings.form.taskNoHabits}
-              </ThemedText>
-            ) : null}
-          </Enter>
-        ) : null}
+            <Chip
+              label={strings.form.color}
+              selected={activeReveal === 'color'}
+              onPress={() => toggleReveal('color')}
+            />
+            <Chip
+              label={describeSchedule(schedule)}
+              icon="calendar"
+              selected={activeReveal === 'schedule'}
+              onPress={() => toggleReveal('schedule')}
+            />
+            <Chip
+              label={reminderEnabled ? formatTime12h(reminderTime) : strings.form.reminder}
+              icon="bell"
+              selected={activeReveal === 'reminder'}
+              onPress={() => toggleReveal('reminder')}
+            />
+          </View>
 
-        {mode === 'task' && !isEditing ? (
-          <>
-            <Enter index={2} style={{ gap: theme.spacing.sm }}>
-              <ThemedText variant="sectionHeader" color="secondary">
-                {strings.a11y.taskName.toUpperCase()}
-              </ThemedText>
-              <TextInput
-                value={taskName}
-                onChangeText={setTaskName}
-                onFocus={() => setTaskNameFocused(true)}
-                onBlur={() => setTaskNameFocused(false)}
-                placeholder={strings.form.taskNamePlaceholder}
-                placeholderTextColor={theme.colors.text.secondary}
-                maxLength={MAX_TASK_NAME_LENGTH}
-                accessibilityLabel={strings.a11y.taskName}
-                returnKeyType="done"
-                style={{
-                  ...theme.typography.body,
-                  color: theme.colors.text.primary,
-                  backgroundColor: theme.colors.surface.secondary,
-                  borderRadius: theme.radius.lg,
-                  paddingHorizontal: theme.spacing.md,
-                  minHeight: 52,
-                  borderWidth: 2,
-                  borderColor: taskNameFocused ? theme.colors.accent.default : 'transparent',
-                  ...(taskNameFocused
-                    ? {
-                        shadowColor: theme.colors.accent.default,
-                        shadowOpacity: theme.scheme === 'dark' ? 0.35 : 0.2,
-                        shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 0 },
-                        elevation: 4,
-                      }
-                    : null),
+          {activeReveal === 'icon' ? (
+            <Animated.View
+              entering={revealIn}
+              exiting={revealOut}
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: theme.spacing.sm,
+                paddingVertical: 3,
+              }}
+            >
+              {habitIcons.map((candidate) => {
+                const selected = candidate === icon;
+                return (
+                  <PressableScale
+                    key={candidate}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setIcon(candidate);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={candidate}
+                    style={{
+                      borderRadius: theme.radius.full,
+                      borderWidth: 2,
+                      borderColor: selected ? theme.colors.habit[color].solid : 'transparent',
+                      padding: 3,
+                    }}
+                  >
+                    <IconWell name={candidate} color={color} size={46} muted={!selected} />
+                  </PressableScale>
+                );
+              })}
+            </Animated.View>
+          ) : null}
+
+          {activeReveal === 'color' ? (
+            <Animated.View
+              entering={revealIn}
+              exiting={revealOut}
+              style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}
+            >
+              {habitColorTokens.map((candidate) => {
+                const selected = candidate === color;
+                return (
+                  <PressableScale
+                    key={candidate}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setColor(candidate);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={candidate}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: theme.radius.full,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 2,
+                      borderColor: selected ? theme.colors.habit[candidate].solid : 'transparent',
+                    }}
+                  >
+                    <ColorSwatch color={candidate} selected={selected} />
+                  </PressableScale>
+                );
+              })}
+            </Animated.View>
+          ) : null}
+
+          {activeReveal === 'schedule' ? (
+            <Animated.View
+              entering={revealIn}
+              exiting={revealOut}
+              style={{ gap: theme.spacing.sm }}
+            >
+              <SegmentedControl
+                accessibilityLabel={strings.a11y.scheduleType}
+                value={scheduleType}
+                onChange={(value) => {
+                  Haptics.selectionAsync();
+                  setScheduleType(value);
                 }}
+                options={[
+                  { value: 'daily', label: strings.form.daily },
+                  { value: 'weekdays', label: strings.form.specificDays },
+                  { value: 'timesPerWeek', label: strings.form.timesPerWeek },
+                ]}
               />
-            </Enter>
 
-            <Enter index={3} style={{ gap: theme.spacing.sm }}>
-              <ThemedText variant="sectionHeader" color="secondary">
-                {strings.form.taskHabitPicker.toUpperCase()}
-              </ThemedText>
+              {scheduleType === 'weekdays' ? (
+                <Animated.View
+                  entering={revealIn}
+                  exiting={revealOut}
+                  style={{ flexDirection: 'row', gap: theme.spacing.xs }}
+                >
+                  {weekdays.map((day) => {
+                    const selected = selectedDays.includes(day);
+                    return (
+                      <PressableScale
+                        key={day}
+                        onPress={() => {
+                          Haptics.selectionAsync();
+                          setSelectedDays((current) =>
+                            current.includes(day)
+                              ? current.filter((existing) => existing !== day)
+                              : [...current, day],
+                          );
+                        }}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: selected }}
+                        accessibilityLabel={strings.weekdayNames[day]}
+                        style={{
+                          flex: 1,
+                          aspectRatio: 1,
+                          borderRadius: theme.radius.full,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: selected
+                            ? theme.colors.habit[color].solid
+                            : theme.colors.surface.secondary,
+                        }}
+                      >
+                        <ThemedText
+                          variant="footnote"
+                          style={{
+                            color: selected ? '#FFFFFF' : theme.colors.text.secondary,
+                            fontWeight: '600',
+                          }}
+                        >
+                          {strings.weekdayInitials[day]}
+                        </ThemedText>
+                      </PressableScale>
+                    );
+                  })}
+                </Animated.View>
+              ) : null}
+
+              {scheduleType === 'timesPerWeek' ? (
+                <Animated.View
+                  entering={revealIn}
+                  exiting={revealOut}
+                  style={{ flexDirection: 'row', gap: theme.spacing.xs }}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map((count) => {
+                    const selected = count === timesPerWeek;
+                    return (
+                      <PressableScale
+                        key={count}
+                        onPress={() => {
+                          Haptics.selectionAsync();
+                          setTimesPerWeek(count);
+                        }}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={strings.a11y.timesPerWeek(count)}
+                        style={{
+                          flex: 1,
+                          aspectRatio: 1,
+                          borderRadius: theme.radius.full,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: selected
+                            ? theme.colors.habit[color].solid
+                            : theme.colors.surface.secondary,
+                        }}
+                      >
+                        <ThemedText
+                          variant="footnote"
+                          style={{
+                            color: selected ? '#FFFFFF' : theme.colors.text.secondary,
+                            fontWeight: '600',
+                          }}
+                        >
+                          {count}
+                        </ThemedText>
+                      </PressableScale>
+                    );
+                  })}
+                </Animated.View>
+              ) : null}
+            </Animated.View>
+          ) : null}
+
+          {activeReveal === 'reminder' ? (
+            <Animated.View entering={revealIn} exiting={revealOut} style={{ gap: theme.spacing.sm }}>
               <View
-                accessibilityLabel={strings.a11y.selectHabitForTask}
                 style={{
                   borderRadius: theme.radius.lg,
                   backgroundColor: theme.colors.surface.secondary,
                   overflow: 'hidden',
                 }}
               >
-                {habitsList.map((entry, index) => {
-                  const selected = entry.habit.id === taskHabitId;
-                  return (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.md,
+                    paddingHorizontal: theme.spacing.md,
+                    minHeight: 52,
+                  }}
+                >
+                  <Icon name="bell" size={18} color={theme.colors.text.secondary} />
+                  <ThemedText variant="body" style={{ flex: 1 }}>
+                    {strings.form.reminder}
+                  </ThemedText>
+                  <Switch
+                    value={reminderEnabled}
+                    onValueChange={onToggleReminder}
+                    accessibilityLabel={strings.a11y.enableReminder}
+                    trackColor={{ true: theme.colors.accent.default }}
+                  />
+                </View>
+
+                {reminderEnabled ? (
+                  <Animated.View entering={revealIn} exiting={revealOut}>
                     <PressableScale
-                      key={entry.habit.id}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        setTaskHabitId(entry.habit.id);
-                      }}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected }}
-                      accessibilityLabel={entry.habit.name}
+                      onPress={() => setPickerVisible((visible) => !visible)}
+                      accessibilityRole="button"
+                      accessibilityLabel={strings.form.time}
                       activeScale={0.99}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        gap: theme.spacing.md,
+                        gap: theme.spacing.sm,
                         paddingHorizontal: theme.spacing.md,
-                        minHeight: 56,
-                        backgroundColor: selected ? theme.colors.accent.subtle : 'transparent',
-                        borderTopWidth: index === 0 ? 0 : 1,
-                        borderTopColor: theme.colors.border.default,
+                        minHeight: 52,
+                        backgroundColor: theme.colors.surface.elevated,
                       }}
                     >
-                      <IconWell name={entry.habit.icon} color={entry.habit.color} size={32} />
+                      <Icon name="clock" size={16} color={theme.colors.text.secondary} />
                       <ThemedText variant="body" style={{ flex: 1 }}>
-                        {entry.habit.name}
+                        {strings.form.time}
                       </ThemedText>
-                      {selected ? (
-                        <Icon name="check" size={16} color={theme.colors.accent.default} />
-                      ) : null}
+                      <View
+                        style={{
+                          backgroundColor: theme.colors.surface.primary,
+                          borderRadius: theme.radius.sm,
+                          paddingHorizontal: theme.spacing.sm,
+                          paddingVertical: 4,
+                        }}
+                      >
+                        <ThemedText variant="body" style={{ fontWeight: '500' }}>
+                          {formatTime12h(reminderTime)}
+                        </ThemedText>
+                      </View>
                     </PressableScale>
-                  );
-                })}
-              </View>
-            </Enter>
-          </>
-        ) : (
-          <>
-            <Enter index={2} lift={false}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: theme.spacing.md,
-                  padding: theme.spacing.md,
-                  borderRadius: theme.radius.lg,
-                  backgroundColor: theme.colors.surface.secondary,
-                }}
-              >
-                <IconWell name={icon} color={color} size={44} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <ThemedText variant="headline" numberOfLines={1}>
-                    {name.trim() || strings.form.previewName}
-                  </ThemedText>
-                  <ThemedText variant="footnote" style={{ color: theme.colors.text.accent }}>
-                    {describeSchedule(schedule)}
-                  </ThemedText>
-                </View>
-                <CompletionCheck completed={false} color={color} />
-              </View>
-            </Enter>
+                  </Animated.View>
+                ) : null}
 
-            <Enter index={3} style={{ gap: theme.spacing.sm }}>
-              <ThemedText variant="sectionHeader" color="secondary">
-                {strings.form.name.toUpperCase()}
-              </ThemedText>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                onFocus={() => setNameFocused(true)}
-                onBlur={() => setNameFocused(false)}
-                placeholder={strings.form.namePlaceholder}
-                placeholderTextColor={theme.colors.text.secondary}
-                maxLength={MAX_HABIT_NAME_LENGTH}
-                accessibilityLabel={strings.a11y.habitName}
-                returnKeyType="done"
-                style={{
-                  ...theme.typography.body,
-                  color: theme.colors.text.primary,
-                  backgroundColor: theme.colors.surface.secondary,
-                  borderRadius: theme.radius.lg,
-                  paddingHorizontal: theme.spacing.md,
-                  minHeight: 52,
-                  borderWidth: 2,
-                  borderColor: nameFocused ? theme.colors.accent.default : 'transparent',
-                  ...(nameFocused
-                    ? {
-                        shadowColor: theme.colors.accent.default,
-                        shadowOpacity: theme.scheme === 'dark' ? 0.35 : 0.2,
-                        shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 0 },
-                        elevation: 4,
-                      }
-                    : null),
-                }}
-              />
-            </Enter>
-
-            <Enter index={4} style={{ gap: theme.spacing.sm }}>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-                <Chip
-                  label={strings.form.icon}
-                  icon={icon}
-                  selected={activeReveal === 'icon'}
-                  onPress={() => toggleReveal('icon')}
-                />
-                <Chip
-                  label={strings.form.color}
-                  selected={activeReveal === 'color'}
-                  onPress={() => toggleReveal('color')}
-                />
-                <Chip
-                  label={describeSchedule(schedule)}
-                  icon="calendar"
-                  selected={activeReveal === 'schedule'}
-                  onPress={() => toggleReveal('schedule')}
-                />
-                <Chip
-                  label={reminderEnabled ? toClockTime(reminderTime) : strings.form.reminder}
-                  icon="bell"
-                  selected={activeReveal === 'reminder'}
-                  onPress={() => toggleReveal('reminder')}
-                />
-              </View>
-
-              {activeReveal === 'icon' ? (
-                <Animated.View
-                  entering={revealIn}
-                  exiting={revealOut}
-                  style={{
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    gap: theme.spacing.sm,
-                    paddingVertical: 3,
-                  }}
-                >
-                  {habitIcons.map((candidate) => {
-                    const selected = candidate === icon;
-                    return (
-                      <PressableScale
-                        key={candidate}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setIcon(candidate);
-                        }}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected }}
-                        accessibilityLabel={candidate}
-                        style={{
-                          borderRadius: theme.radius.full,
-                          borderWidth: 2,
-                          borderColor: selected ? theme.colors.habit[color].solid : 'transparent',
-                          padding: 3,
-                        }}
-                      >
-                        <IconWell name={candidate} color={color} size={46} muted={!selected} />
-                      </PressableScale>
-                    );
-                  })}
-                </Animated.View>
-              ) : null}
-
-              {activeReveal === 'color' ? (
-                <Animated.View
-                  entering={revealIn}
-                  exiting={revealOut}
-                  style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.md }}
-                >
-                  {habitColorTokens.map((candidate) => {
-                    const selected = candidate === color;
-                    return (
-                      <PressableScale
-                        key={candidate}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setColor(candidate);
-                        }}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected }}
-                        accessibilityLabel={candidate}
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: theme.radius.full,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderWidth: 2,
-                          borderColor: selected ? theme.colors.habit[candidate].solid : 'transparent',
-                        }}
-                      >
-                        <ColorSwatch color={candidate} selected={selected} />
-                      </PressableScale>
-                    );
-                  })}
-                </Animated.View>
-              ) : null}
-
-              {activeReveal === 'schedule' ? (
-                <Animated.View
-                  entering={revealIn}
-                  exiting={revealOut}
-                  style={{ gap: theme.spacing.sm }}
-                >
-                  <SegmentedControl
-                    accessibilityLabel={strings.a11y.scheduleType}
-                    value={scheduleType}
-                    onChange={(value) => {
-                      Haptics.selectionAsync();
-                      setScheduleType(value);
-                    }}
-                    options={[
-                      { value: 'daily', label: strings.form.daily },
-                      { value: 'weekdays', label: strings.form.specificDays },
-                      { value: 'timesPerWeek', label: strings.form.timesPerWeek },
-                    ]}
-                  />
-
-                  {scheduleType === 'weekdays' ? (
-                    <Animated.View
-                      entering={revealIn}
-                      exiting={revealOut}
-                      style={{ flexDirection: 'row', gap: theme.spacing.xs }}
-                    >
-                      {weekdays.map((day) => {
-                        const selected = selectedDays.includes(day);
-                        return (
-                          <PressableScale
-                            key={day}
-                            onPress={() => {
-                              Haptics.selectionAsync();
-                              setSelectedDays((current) =>
-                                current.includes(day)
-                                  ? current.filter((existing) => existing !== day)
-                                  : [...current, day],
-                              );
-                            }}
-                            accessibilityRole="checkbox"
-                            accessibilityState={{ checked: selected }}
-                            accessibilityLabel={strings.weekdayNames[day]}
-                            style={{
-                              flex: 1,
-                              aspectRatio: 1,
-                              borderRadius: theme.radius.full,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: selected
-                                ? theme.colors.habit[color].solid
-                                : theme.colors.surface.secondary,
-                            }}
-                          >
-                            <ThemedText
-                              variant="footnote"
-                              style={{
-                                color: selected ? '#FFFFFF' : theme.colors.text.secondary,
-                                fontWeight: '600',
-                              }}
-                            >
-                              {strings.weekdayInitials[day]}
-                            </ThemedText>
-                          </PressableScale>
-                        );
-                      })}
-                    </Animated.View>
-                  ) : null}
-
-                  {scheduleType === 'timesPerWeek' ? (
-                    <Animated.View
-                      entering={revealIn}
-                      exiting={revealOut}
-                      style={{ flexDirection: 'row', gap: theme.spacing.xs }}
-                    >
-                      {[1, 2, 3, 4, 5, 6, 7].map((count) => {
-                        const selected = count === timesPerWeek;
-                        return (
-                          <PressableScale
-                            key={count}
-                            onPress={() => {
-                              Haptics.selectionAsync();
-                              setTimesPerWeek(count);
-                            }}
-                            accessibilityRole="radio"
-                            accessibilityState={{ selected }}
-                            accessibilityLabel={strings.a11y.timesPerWeek(count)}
-                            style={{
-                              flex: 1,
-                              aspectRatio: 1,
-                              borderRadius: theme.radius.full,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: selected
-                                ? theme.colors.habit[color].solid
-                                : theme.colors.surface.secondary,
-                            }}
-                          >
-                            <ThemedText
-                              variant="footnote"
-                              style={{
-                                color: selected ? '#FFFFFF' : theme.colors.text.secondary,
-                                fontWeight: '600',
-                              }}
-                            >
-                              {count}
-                            </ThemedText>
-                          </PressableScale>
-                        );
-                      })}
-                    </Animated.View>
-                  ) : null}
-                </Animated.View>
-              ) : null}
-
-              {activeReveal === 'reminder' ? (
-                <Animated.View entering={revealIn} exiting={revealOut} style={{ gap: theme.spacing.sm }}>
-                  <View
-                    style={{
-                      borderRadius: theme.radius.lg,
-                      backgroundColor: theme.colors.surface.secondary,
-                      overflow: 'hidden',
-                    }}
-                  >
+                {reminderEnabled && scheduleType === 'daily' ? (
+                  <Animated.View entering={revealIn} exiting={revealOut}>
                     <View
                       style={{
                         flexDirection: 'row',
@@ -677,183 +596,128 @@ export default function HabitFormScreen() {
                         gap: theme.spacing.md,
                         paddingHorizontal: theme.spacing.md,
                         minHeight: 52,
+                        backgroundColor: theme.colors.surface.elevated,
                       }}
                     >
-                      <Icon name="bell" size={18} color={theme.colors.text.secondary} />
-                      <ThemedText variant="body" style={{ flex: 1 }}>
-                        {strings.form.reminder}
+                      <ThemedText variant="footnote" style={{ flex: 1 }}>
+                        {strings.form.preReminder}
                       </ThemedText>
                       <Switch
-                        value={reminderEnabled}
-                        onValueChange={onToggleReminder}
-                        accessibilityLabel={strings.a11y.enableReminder}
+                        value={preReminderEnabled}
+                        onValueChange={(value) => {
+                          Haptics.selectionAsync();
+                          setPreReminderEnabled(value);
+                        }}
+                        accessibilityLabel={strings.a11y.enablePreReminder}
                         trackColor={{ true: theme.colors.accent.default }}
                       />
                     </View>
-
-                    {reminderEnabled ? (
-                      <Animated.View entering={revealIn} exiting={revealOut}>
-                        <PressableScale
-                          onPress={() => setPickerVisible((visible) => !visible)}
-                          accessibilityRole="button"
-                          accessibilityLabel={strings.form.time}
-                          activeScale={0.99}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            paddingHorizontal: theme.spacing.md,
-                            minHeight: 52,
-                            backgroundColor: theme.colors.surface.elevated,
-                          }}
-                        >
-                          <ThemedText variant="body" style={{ flex: 1 }}>
-                            {strings.form.time}
-                          </ThemedText>
-                          <ThemedText variant="body" style={{ color: theme.colors.accent.default }}>
-                            {toClockTime(reminderTime)}
-                          </ThemedText>
-                        </PressableScale>
-                      </Animated.View>
-                    ) : null}
-
-                    {reminderEnabled && scheduleType === 'daily' ? (
-                      <Animated.View entering={revealIn} exiting={revealOut}>
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: theme.spacing.md,
-                            paddingHorizontal: theme.spacing.md,
-                            minHeight: 52,
-                            backgroundColor: theme.colors.surface.elevated,
-                          }}
-                        >
-                          <ThemedText variant="footnote" style={{ flex: 1 }}>
-                            {strings.form.preReminder}
-                          </ThemedText>
-                          <Switch
-                            value={preReminderEnabled}
-                            onValueChange={(value) => {
-                              Haptics.selectionAsync();
-                              setPreReminderEnabled(value);
-                            }}
-                            accessibilityLabel={strings.a11y.enablePreReminder}
-                            trackColor={{ true: theme.colors.accent.default }}
-                          />
-                        </View>
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: theme.spacing.md,
-                            paddingHorizontal: theme.spacing.md,
-                            minHeight: 52,
-                            backgroundColor: theme.colors.surface.elevated,
-                          }}
-                        >
-                          <ThemedText variant="footnote" style={{ flex: 1 }}>
-                            {strings.form.followupReminder}
-                          </ThemedText>
-                          <Switch
-                            value={followupReminderEnabled}
-                            onValueChange={(value) => {
-                              Haptics.selectionAsync();
-                              setFollowupReminderEnabled(value);
-                            }}
-                            accessibilityLabel={strings.a11y.enableFollowupReminder}
-                            trackColor={{ true: theme.colors.accent.default }}
-                          />
-                        </View>
-                      </Animated.View>
-                    ) : null}
-
-                    {reminderEnabled && scheduleType !== 'daily' ? (
-                      <Animated.View entering={revealIn} exiting={revealOut}>
-                        <View
-                          style={{
-                            paddingHorizontal: theme.spacing.md,
-                            paddingVertical: theme.spacing.sm,
-                            backgroundColor: theme.colors.surface.elevated,
-                          }}
-                        >
-                          <ThemedText variant="footnote" color="secondary">
-                            {strings.form.multiAlertDailyOnly}
-                          </ThemedText>
-                        </View>
-                      </Animated.View>
-                    ) : null}
-                  </View>
-
-                  {reminderEnabled && pickerVisible ? (
-                    <DateTimePicker
-                      value={reminderTime}
-                      mode="time"
-                      is24Hour
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onChange={(_event, date) => {
-                        if (Platform.OS !== 'ios') setPickerVisible(false);
-                        if (date) setReminderTime(date);
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: theme.spacing.md,
+                        paddingHorizontal: theme.spacing.md,
+                        minHeight: 52,
+                        backgroundColor: theme.colors.surface.elevated,
                       }}
-                    />
-                  ) : null}
-
-                  {reminderEnabled && permission === 'denied' ? (
-                    <Animated.View entering={revealIn} exiting={revealOut}>
-                      <PressableScale
-                        onPress={() => Linking.openSettings()}
-                        accessibilityRole="button"
-                        accessibilityLabel={strings.reminders.openSettings}
-                        activeScale={0.99}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: theme.spacing.sm,
-                          padding: theme.spacing.md,
-                          borderRadius: theme.radius.lg,
-                          backgroundColor: theme.colors.state.dangerSubtle,
-                        }}
-                      >
-                        <Icon name="bell" size={16} color={theme.colors.state.danger} />
-                        <ThemedText variant="footnote" style={{ flex: 1, color: theme.colors.state.danger }}>
-                          {strings.reminders.permissionDenied}
-                        </ThemedText>
-                        <Icon name="chevron" size={14} color={theme.colors.state.danger} />
-                      </PressableScale>
-                    </Animated.View>
-                  ) : null}
-
-                  {reminderEnabled ? (
-                    <Animated.View entering={revealIn} exiting={revealOut}>
-                      <ThemedText variant="footnote" color="secondary">
-                        {strings.form.reminderNote}
+                    >
+                      <ThemedText variant="footnote" style={{ flex: 1 }}>
+                        {strings.form.followupReminder}
                       </ThemedText>
-                    </Animated.View>
-                  ) : null}
+                      <Switch
+                        value={followupReminderEnabled}
+                        onValueChange={(value) => {
+                          Haptics.selectionAsync();
+                          setFollowupReminderEnabled(value);
+                        }}
+                        accessibilityLabel={strings.a11y.enableFollowupReminder}
+                        trackColor={{ true: theme.colors.accent.default }}
+                      />
+                    </View>
+                  </Animated.View>
+                ) : null}
+
+                {reminderEnabled && scheduleType !== 'daily' ? (
+                  <Animated.View entering={revealIn} exiting={revealOut}>
+                    <View
+                      style={{
+                        paddingHorizontal: theme.spacing.md,
+                        paddingVertical: theme.spacing.sm,
+                        backgroundColor: theme.colors.surface.elevated,
+                      }}
+                    >
+                      <ThemedText variant="footnote" color="secondary">
+                        {strings.form.multiAlertDailyOnly}
+                      </ThemedText>
+                    </View>
+                  </Animated.View>
+                ) : null}
+              </View>
+
+              <TimePickerModal
+                visible={reminderEnabled && pickerVisible}
+                value={reminderTime}
+                onCancel={() => setPickerVisible(false)}
+                onConfirm={(date) => {
+                  setReminderTime(date);
+                  setPickerVisible(false);
+                }}
+              />
+
+              {reminderEnabled && permission === 'denied' ? (
+                <Animated.View entering={revealIn} exiting={revealOut}>
+                  <PressableScale
+                    onPress={() => Linking.openSettings()}
+                    accessibilityRole="button"
+                    accessibilityLabel={strings.reminders.openSettings}
+                    activeScale={0.99}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: theme.spacing.sm,
+                      padding: theme.spacing.md,
+                      borderRadius: theme.radius.lg,
+                      backgroundColor: theme.colors.state.dangerSubtle,
+                    }}
+                  >
+                    <Icon name="bell" size={16} color={theme.colors.state.danger} />
+                    <ThemedText variant="footnote" style={{ flex: 1, color: theme.colors.state.danger }}>
+                      {strings.reminders.permissionDenied}
+                    </ThemedText>
+                    <Icon name="chevron" size={14} color={theme.colors.state.danger} />
+                  </PressableScale>
                 </Animated.View>
               ) : null}
-            </Enter>
 
-            {isEditing ? (
-              <Enter index={5} style={{ gap: theme.spacing.sm }}>
-                <Button
-                  label={archived ? strings.form.unarchive : strings.form.archive}
-                  variant="secondary"
-                  icon={archived ? 'restore' : 'export'}
-                  onPress={onArchive}
-                />
-                <ThemedText variant="footnote" color="secondary">
-                  {strings.form.archiveNote}
-                </ThemedText>
-                <Button
-                  label={strings.form.delete}
-                  variant="destructive"
-                  icon="trash"
-                  onPress={() => setConfirmingDelete(true)}
-                />
-              </Enter>
-            ) : null}
-          </>
-        )}
+              {reminderEnabled ? (
+                <Animated.View entering={revealIn} exiting={revealOut}>
+                  <ThemedText variant="footnote" color="secondary">
+                    {strings.form.reminderNote}
+                  </ThemedText>
+                </Animated.View>
+              ) : null}
+            </Animated.View>
+          ) : null}
+        </Enter>
+
+        <Enter index={5} style={{ gap: theme.spacing.sm }}>
+          <Button
+            label={archived ? strings.form.unarchive : strings.form.archive}
+            variant="secondary"
+            icon={archived ? 'restore' : 'export'}
+            onPress={onArchive}
+          />
+          <ThemedText variant="footnote" color="secondary">
+            {strings.form.archiveNote}
+          </ThemedText>
+          <Button
+            label={strings.form.delete}
+            variant="destructive"
+            icon="trash"
+            onPress={() => setConfirmingDelete(true)}
+          />
+        </Enter>
       </ScrollView>
 
       <View
@@ -874,11 +738,11 @@ export default function HabitFormScreen() {
         }}
       >
         <Button
-          label={mode === 'task' && !isEditing ? strings.form.saveTask : strings.form.save}
+          label={strings.form.save}
           icon="check"
           onPress={onSave}
           disabled={!canSave}
-          tint={mode === 'task' && !isEditing ? theme.colors.accent.default : theme.colors.habit[color].solid}
+          tint={theme.colors.habit[color].solid}
           accessibilityLabel={strings.a11y.saveHabit}
         />
       </View>

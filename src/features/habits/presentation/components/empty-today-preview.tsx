@@ -11,21 +11,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useAppTheme } from '@/core/theme';
-import { colors as staticColors } from '@/core/theme/colors';
 import { Icon } from '@/core/ui/icon';
 import { IconWell } from '@/core/ui/icon-well';
 import { ThemedText } from '@/core/ui/themed-text';
 import { strings } from '@/core/i18n';
 import type { IconName } from '@/core/ui/icons';
-
-// These ghost cards represent paper-colored mock cards, not real UI
-// surfaces — like a physical pastel card, they don't change with dark mode,
-// so they intentionally always read from the light palette regardless of
-// the active theme.
-const GHOST_CARD_PINK = staticColors.light.habit.pink.tint;
-const GHOST_CARD_BLUE = staticColors.light.habit.blue.tint;
-const GHOST_TEXT_COLOR = staticColors.light.text.primary;
-const GHOST_CHECK_COLOR = staticColors.light.text.secondary;
 
 const CARD_WIDTH = 240;
 
@@ -65,7 +55,23 @@ function useFloat(
   }));
 }
 
-function GhostCardRow({ icon, name, detail }: { icon: IconName; name: string; detail: string }) {
+type GhostCardRowProps = {
+  icon: IconName;
+  name: string;
+  detail: string;
+  textColor: string;
+  checkColor: string;
+  wellBackground: string;
+};
+
+function GhostCardRow({
+  icon,
+  name,
+  detail,
+  textColor,
+  checkColor,
+  wellBackground,
+}: GhostCardRowProps) {
   return (
     <View style={{ position: 'absolute', top: 6, left: 16, gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -75,7 +81,7 @@ function GhostCardRow({ icon, name, detail }: { icon: IconName; name: string; de
             height: 14,
             borderRadius: 999,
             borderWidth: 2,
-            borderColor: GHOST_CHECK_COLOR,
+            borderColor: checkColor,
           }}
         />
         <View
@@ -83,21 +89,21 @@ function GhostCardRow({ icon, name, detail }: { icon: IconName; name: string; de
             width: 20,
             height: 20,
             borderRadius: 999,
-            backgroundColor: 'rgba(255,255,255,0.65)',
+            backgroundColor: wellBackground,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Icon name={icon} size={11} color={GHOST_TEXT_COLOR} />
+          <Icon name={icon} size={11} color={textColor} />
         </View>
-        <ThemedText variant="footnote" numberOfLines={1} style={{ color: GHOST_TEXT_COLOR }}>
+        <ThemedText variant="footnote" numberOfLines={1} style={{ color: textColor }}>
           {name}
         </ThemedText>
       </View>
       <ThemedText
         variant="caption"
         numberOfLines={1}
-        style={{ color: GHOST_TEXT_COLOR, opacity: 0.7, marginLeft: 26 }}
+        style={{ color: textColor, opacity: 0.7, marginLeft: 26 }}
       >
         {detail}
       </ThemedText>
@@ -111,6 +117,11 @@ export function EmptyTodayPreview() {
   const floatA = useFloat(8, 4200, 0, reducedMotion, -6, -6);
   const floatB = useFloat(6, 3600, 250, reducedMotion, 6, 5);
 
+  const ghostTextColor = theme.colors.text.primary;
+  const ghostCheckColor = theme.colors.text.secondary;
+  const ghostWellBackground =
+    theme.scheme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.65)';
+
   return (
     <View style={{ width: CARD_WIDTH + 64, height: 248, alignItems: 'center' }}>
       <Animated.View
@@ -121,7 +132,7 @@ export function EmptyTodayPreview() {
             width: CARD_WIDTH,
             height: 100,
             borderRadius: theme.radius.xl,
-            backgroundColor: GHOST_CARD_PINK,
+            backgroundColor: theme.colors.habit.pink.tint,
           },
           floatA,
         ]}
@@ -130,6 +141,9 @@ export function EmptyTodayPreview() {
           icon="book"
           name={strings.today.previewGhostCardName}
           detail={strings.today.previewGhostCardDetail}
+          textColor={ghostTextColor}
+          checkColor={ghostCheckColor}
+          wellBackground={ghostWellBackground}
         />
       </Animated.View>
       <Animated.View
@@ -140,7 +154,7 @@ export function EmptyTodayPreview() {
             width: CARD_WIDTH,
             height: 100,
             borderRadius: theme.radius.xl,
-            backgroundColor: GHOST_CARD_BLUE,
+            backgroundColor: theme.colors.habit.blue.tint,
           },
           floatB,
         ]}
@@ -149,6 +163,9 @@ export function EmptyTodayPreview() {
           icon="water"
           name={strings.today.previewGhostCardName2}
           detail={strings.today.previewGhostCardDetail2}
+          textColor={ghostTextColor}
+          checkColor={ghostCheckColor}
+          wellBackground={ghostWellBackground}
         />
       </Animated.View>
 
@@ -158,7 +175,9 @@ export function EmptyTodayPreview() {
           top: 80,
           width: CARD_WIDTH,
           borderRadius: theme.radius.xl,
-          backgroundColor: theme.colors.surface.secondary,
+          backgroundColor: theme.colors.surface.frontCard,
+          borderWidth: theme.scheme === 'dark' ? 1 : 0,
+          borderColor: theme.colors.border.default,
           padding: theme.spacing.md,
           gap: theme.spacing.sm,
           transform: [{ rotate: '2deg' }],

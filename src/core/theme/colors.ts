@@ -44,6 +44,8 @@ export const colors = {
 
       elevated: '#EFEFF1',
 
+      frontCard: '#FFFFFF',
+
       scrim: 'rgba(0, 0, 0, 0.4)',
     },
     text: {
@@ -74,6 +76,8 @@ export const colors = {
       primary: '#000000',
       secondary: '#1C1C1F',
       elevated: '#2A2A2E',
+
+      frontCard: '#242429',
 
       scrim: 'rgba(0, 0, 0, 0.6)',
     },

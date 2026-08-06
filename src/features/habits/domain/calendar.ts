@@ -86,3 +86,43 @@ export function buildMonthGrid(month: ISODate, today: ISODate = todayDate()): Mo
 
   return { weeks, month: first, canGoNext: first < startOfMonth(today) };
 }
+
+export type DeadlineMonthCell = { date: ISODate; day: number; past: boolean } | null;
+
+export type DeadlineMonthGrid = {
+  weeks: DeadlineMonthCell[][];
+  month: ISODate;
+};
+
+// Unlike buildMonthGrid (which marks completion-history days as `future` and
+// forbids navigating past the current month), a deadline is always today or
+// later — so this marks days before today as `past` instead, and never
+// restricts forward navigation.
+export function buildDeadlineMonthGrid(month: ISODate, today: ISODate = todayDate()): DeadlineMonthGrid {
+  const first = startOfMonth(month);
+  const last = addDays(shiftMonth(first, 1), -1);
+  const gridStart = startOfWeek(first);
+
+  const weeks: DeadlineMonthCell[][] = [];
+  let week: DeadlineMonthCell[] = [];
+
+  for (let day = gridStart; day <= last; day = addDays(day, 1)) {
+    week.push(
+      day < first
+        ? null
+        : { date: day, day: Number(day.slice(8)), past: day < today },
+    );
+
+    if (week.length === WEEK_LENGTH) {
+      weeks.push(week);
+      week = [];
+    }
+  }
+
+  if (week.length > 0) {
+    while (week.length < WEEK_LENGTH) week.push(null);
+    weeks.push(week);
+  }
+
+  return { weeks, month: first };
+}

@@ -52,3 +52,11 @@ export function formatDayLong(iso: ISODate): string {
     month: 'long',
   });
 }
+
+export function formatDeadline(date: Date): string {
+  const day = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace('.', '');
+  const time = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true }).format(
+    date,
+  );
+  return `${day} · ${time}`;
+}

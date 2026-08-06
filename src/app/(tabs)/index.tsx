@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
-import { Modal, ScrollView, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withTiming,
+  interpolate,
   useReducedMotion,
 } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +19,8 @@ import {
   EmptyState,
   Enter,
   ConfirmDialog,
+  useModalProgress,
+  useSuccessOverlayStore,
 } from "@/core/ui";
 import { getUseCases } from "@/core/di";
 import { DailyGoal } from "@/features/habits/presentation/components/daily-goal";
@@ -25,25 +28,29 @@ import {
   DayCompleteOverlay,
   useDayComplete,
 } from "@/features/habits/presentation/components/day-complete";
-import { HabitRow } from "@/features/habits/presentation/components/habit-row";
+import { HabitRow, HABIT_ROW_HEIGHT } from "@/features/habits/presentation/components/habit-row";
 import { EmptyTodayPreview } from "@/features/habits/presentation/components/empty-today-preview";
 import { DraggableHabitList } from "@/features/habits/presentation/components/draggable-habit-list";
+import { TaskCard } from "@/features/habits/presentation/components/task-card";
+import { TaskDetailSheet } from "@/features/habits/presentation/components/task-detail-sheet";
+import { TaskEditSheet } from "@/features/habits/presentation/components/task-edit-sheet";
 import { useHabitsStore } from "@/features/habits/presentation/store";
+import { useCreateSheetStore } from "@/features/habits/presentation/create-sheet-store";
 import { useOnboardingStore } from "@/features/onboarding/presentation/store";
-import {
-  describeSchedule,
-  describeStreak,
-  formatToday,
-} from "@/features/habits/presentation/format";
+import { describeSchedule, formatToday } from "@/features/habits/presentation/format";
 import type { TodayHabit } from "@/features/habits/domain/use-cases/get-today-habits";
+import type { TaskWithState } from "@/features/habits/domain/use-cases/get-habit-tasks";
+import type { IconName } from "@/core/ui/icons";
 
 function subtitleFor(entry: TodayHabit): string {
-  return entry.streaks.current > 0
-    ? describeStreak(entry.streaks)
-    : describeSchedule(entry.habit.schedule);
+  return describeSchedule(entry.habit.schedule);
 }
 
+const subtitleIcon: IconName = "repeat";
+
 type Notice = { visible: false } | { visible: true; title: string; message: string };
+type ListFilter = "all" | "withTasks" | "completed";
+const CARD_GAP = 8;
 
 export default function TodayScreen() {
   const theme = useAppTheme();
@@ -54,14 +61,33 @@ export default function TodayScreen() {
   const loadToday = useHabitsStore((state) => state.loadToday);
   const loadHabits = useHabitsStore((state) => state.loadHabits);
   const toggle = useHabitsStore((state) => state.toggle);
+  const toggleTask = useHabitsStore((state) => state.toggleTask);
+  const deleteTask = useHabitsStore((state) => state.deleteTask);
   const reorder = useHabitsStore((state) => state.reorder);
-  const remove = useHabitsStore((state) => state.remove);
-  const [pendingDelete, setPendingDelete] = useState<TodayHabit | null>(null);
+  const [pendingDeleteTask, setPendingDeleteTask] = useState<TaskWithState | null>(null);
+  const [removingTaskId, setRemovingTaskId] = useState<string | null>(null);
+  const [viewingTask, setViewingTask] = useState<TaskWithState | null>(null);
+  const [editingTask, setEditingTask] = useState<TaskWithState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [listsMenuOpen, setListsMenuOpen] = useState(false);
+  const [listFilter, setListFilter] = useState<ListFilter>("all");
   const [notice, setNotice] = useState<Notice>({ visible: false });
   const reducedMotion = useReducedMotion();
+
+  const menuModal = useModalProgress(menuOpen);
+  const listsModal = useModalProgress(listsMenuOpen);
+  const menuScrimStyle = useAnimatedStyle(() => ({ opacity: menuModal.progress.value }));
+  const menuCardStyle = useAnimatedStyle(() => ({
+    opacity: menuModal.progress.value,
+    transform: [{ translateY: interpolate(menuModal.progress.value, [0, 1], [24, 0]) }],
+  }));
+  const listsScrimStyle = useAnimatedStyle(() => ({ opacity: listsModal.progress.value }));
+  const listsCardStyle = useAnimatedStyle(() => ({
+    opacity: listsModal.progress.value,
+    transform: [{ translateY: interpolate(listsModal.progress.value, [0, 1], [24, 0]) }],
+  }));
 
   useFocusEffect(
     useCallback(() => {
@@ -69,7 +95,7 @@ export default function TodayScreen() {
       loadHabits();
 
       if (useOnboardingStore.getState().takeFirstHabitIntent())
-        router.push("/habit-form");
+        useCreateSheetStore.getState().open();
     }, [loadToday, loadHabits]),
   );
 
@@ -78,9 +104,14 @@ export default function TodayScreen() {
 
   const filteredToday = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (query.length === 0) return today;
-    return today.filter((entry) => entry.habit.name.toLowerCase().includes(query));
-  }, [today, searchQuery]);
+    return today
+      .filter((entry) => query.length === 0 || entry.habit.name.toLowerCase().includes(query))
+      .filter((entry) => {
+        if (listFilter === "withTasks") return entry.tasks.length > 0;
+        if (listFilter === "completed") return entry.completedToday;
+        return true;
+      });
+  }, [today, searchQuery, listFilter]);
 
   const listStyle = useAnimatedStyle(() => ({
     opacity: withTiming(celebrating && !reducedMotion ? 0.25 : 1, {
@@ -94,6 +125,14 @@ export default function TodayScreen() {
       toggle(id);
     },
     [toggle],
+  );
+
+  const onToggleTask = useCallback(
+    (id: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      toggleTask(id);
+    },
+    [toggleTask],
   );
 
   const closeSearch = () => {
@@ -119,8 +158,17 @@ export default function TodayScreen() {
     }
   };
 
+  const onEditTask = (task: TaskWithState) => {
+    setEditingTask(task);
+  };
+
+  const viewingTaskHabitColor =
+    viewingTask &&
+    today.find((entry) => entry.habit.id === viewingTask.habitId)?.habit.color;
+
   const hasAnyHabits = habits.length > 0;
   const isSearching = searchOpen && searchQuery.trim().length > 0;
+  const isFiltered = isSearching || listFilter !== "all";
 
   return (
     <SafeAreaView
@@ -196,6 +244,28 @@ export default function TodayScreen() {
             >
               <Icon name="more" size={16} color={theme.colors.text.secondary} />
             </PressableScale>
+            <PressableScale
+              onPress={() => setListsMenuOpen(true)}
+              disabled={today.length === 0}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: today.length === 0 }}
+              accessibilityLabel={strings.today.listsButton}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: theme.radius.full,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: listFilter !== "all" ? theme.colors.accent.subtle : "transparent",
+                opacity: today.length === 0 ? 0.35 : 1,
+              }}
+            >
+              <Icon
+                name="habits"
+                size={16}
+                color={listFilter !== "all" ? theme.colors.accent.default : theme.colors.text.secondary}
+              />
+            </PressableScale>
           </View>
         </Enter>
 
@@ -221,12 +291,7 @@ export default function TodayScreen() {
           </Enter>
         ) : null}
 
-        {isLoading ? null : isSearching && filteredToday.length === 0 ? (
-          <EmptyState
-            title={strings.today.noResultsTitle}
-            message={strings.today.noResultsMessage(searchQuery.trim())}
-          />
-        ) : today.length === 0 ? (
+        {isLoading ? null : today.length === 0 ? (
           hasAnyHabits ? (
             <EmptyState
               title={strings.today.nothingDueTitle}
@@ -245,16 +310,19 @@ export default function TodayScreen() {
               <DailyGoal done={doneCount} total={today.length} />
             </Enter>
 
+            {isFiltered && filteredToday.length === 0 ? (
+              <EmptyState
+                title={strings.today.noResultsTitle}
+                message={
+                  isSearching
+                    ? strings.today.noResultsMessage(searchQuery.trim())
+                    : strings.today.listFilterEmptyMessage
+                }
+              />
+            ) : (
             <View>
               <Animated.View style={listStyle}>
-                <Enter
-                  index={3}
-                  style={{
-                    backgroundColor: theme.colors.surface.secondary,
-                    borderRadius: theme.radius.lg,
-                    overflow: "hidden",
-                  }}
-                >
+                <Enter index={3}>
                   <DraggableHabitList
                     items={filteredToday}
                     keyExtractor={(entry) => entry.habit.id}
@@ -269,21 +337,48 @@ export default function TodayScreen() {
                           : ""
                       }`
                     }
-                    onToggle={onToggle}
+                    onToggle={() => {}}
                     onReorder={reorder}
-                    onEdit={(id) => router.push(`/habit-form?id=${id}`)}
-                    onDelete={(id) =>
-                      setPendingDelete(
-                        today.find((entry) => entry.habit.id === id) ?? null,
-                      )
-                    }
-                    renderItem={(entry) => (
-                      <HabitRow
-                        habit={entry.habit}
-                        subtitle={subtitleFor(entry)}
-                        completed={entry.completedToday}
-                        taskProgress={entry.taskProgress}
-                      />
+                    slot={HABIT_ROW_HEIGHT + CARD_GAP}
+                    separators={false}
+                    canExpand={(entry) => entry.tasks.length > 0}
+                    renderExpanded={(entry) => (
+                      <View
+                        style={{
+                          gap: theme.spacing.sm,
+                          paddingHorizontal: theme.spacing.md,
+                          paddingBottom: theme.spacing.md,
+                          paddingTop: theme.spacing.xs,
+                        }}
+                      >
+                        {entry.tasks.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            habitColor={entry.habit.color}
+                            onToggle={onToggleTask}
+                            onPress={setViewingTask}
+                            onEdit={onEditTask}
+                            onDelete={setPendingDeleteTask}
+                            removing={task.id === removingTaskId}
+                          />
+                        ))}
+                      </View>
+                    )}
+                    renderItem={(entry, { expanded }) => (
+                      <View style={{ paddingBottom: CARD_GAP }}>
+                        <HabitRow
+                          habit={entry.habit}
+                          subtitle={subtitleFor(entry)}
+                          subtitleIcon={subtitleIcon}
+                          streakCount={entry.streaks.current}
+                          completed={entry.completedToday}
+                          taskProgress={entry.taskProgress}
+                          onToggle={() => onToggle(entry.habit.id)}
+                          expandable={entry.tasks.length > 0 || expanded}
+                          expanded={expanded}
+                        />
+                      </View>
                     )}
                   />
                 </Enter>
@@ -291,59 +386,123 @@ export default function TodayScreen() {
 
               <DayCompleteOverlay visible={celebrating} />
             </View>
+            )}
           </>
         )}
       </ScrollView>
 
-      <View
-        pointerEvents="box-none"
-        style={{
-          position: "absolute",
-          right: theme.spacing.md,
-          bottom: insets.bottom + theme.spacing.sm,
-          width: 64,
-          height: 64,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <PressableScale
-          onPress={() => router.push("/habit-form")}
-          accessibilityRole="button"
-          accessibilityLabel={strings.a11y.addHabit}
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: theme.radius.full,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: theme.colors.surface.secondary,
-            shadowColor: theme.scheme === "dark" ? "#000" : theme.colors.text.primary,
-            shadowOpacity: theme.scheme === "dark" ? 0.25 : 0.1,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: 6 },
-            elevation: 6,
-          }}
-        >
-          <Icon name="add" size={24} color={theme.colors.accent.default} />
-        </PressableScale>
-      </View>
-
       <Modal
-        visible={menuOpen}
+        visible={menuModal.shouldRender}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setMenuOpen(false)}
       >
-        <PressableScale
-          onPress={() => setMenuOpen(false)}
-          style={{
-            flex: 1,
-            backgroundColor: theme.colors.surface.scrim,
-            justifyContent: "flex-end",
-            padding: theme.spacing.md,
-          }}
+        <Animated.View
+          style={[
+            {
+              flex: 1,
+              backgroundColor: theme.colors.surface.scrim,
+              justifyContent: "flex-end",
+              padding: theme.spacing.md,
+            },
+            menuScrimStyle,
+          ]}
         >
+          <Pressable
+            style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+            onPress={() => setMenuOpen(false)}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+
+          <Animated.View style={menuCardStyle}>
+            <View
+              style={{
+                borderRadius: theme.radius.xl,
+                backgroundColor: theme.colors.surface.secondary,
+                overflow: "hidden",
+                marginBottom: insets.bottom,
+              }}
+            >
+              <PressableScale
+                onPress={onViewArchived}
+                accessibilityRole="button"
+                accessibilityLabel={strings.today.menuViewArchived}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.md,
+                  minHeight: 52,
+                }}
+              >
+                <Icon name="archive" size={18} color={theme.colors.text.primary} />
+                <ThemedText variant="body">{strings.today.menuViewArchived}</ThemedText>
+              </PressableScale>
+              <View style={{ height: 1, backgroundColor: theme.colors.border.default }} />
+              <PressableScale
+                onPress={onExportBackup}
+                accessibilityRole="button"
+                accessibilityLabel={strings.today.menuExportBackup}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.md,
+                  minHeight: 52,
+                }}
+              >
+                <Icon name="export" size={18} color={theme.colors.text.primary} />
+                <ThemedText variant="body">{strings.today.menuExportBackup}</ThemedText>
+              </PressableScale>
+            </View>
+
+            <PressableScale
+              onPress={() => setMenuOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel={strings.today.menuCancel}
+              style={{
+                borderRadius: theme.radius.xl,
+                backgroundColor: theme.colors.surface.secondary,
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 52,
+                marginBottom: insets.bottom,
+              }}
+            >
+              <ThemedText variant="body" style={{ fontWeight: "600" }}>
+                {strings.today.menuCancel}
+              </ThemedText>
+            </PressableScale>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      <Modal
+        visible={listsModal.shouldRender}
+        transparent
+        animationType="none"
+        onRequestClose={() => setListsMenuOpen(false)}
+      >
+        <Animated.View
+          style={[
+            {
+              flex: 1,
+              backgroundColor: theme.colors.surface.scrim,
+              justifyContent: "flex-end",
+              padding: theme.spacing.md,
+            },
+            listsScrimStyle,
+          ]}
+        >
+          <Pressable
+            style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+            onPress={() => setListsMenuOpen(false)}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+
+          <Animated.View style={listsCardStyle}>
           <View
             style={{
               borderRadius: theme.radius.xl,
@@ -352,41 +511,61 @@ export default function TodayScreen() {
               marginBottom: insets.bottom,
             }}
           >
-            <PressableScale
-              onPress={onViewArchived}
-              accessibilityRole="button"
-              accessibilityLabel={strings.today.menuViewArchived}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: theme.spacing.md,
-                paddingHorizontal: theme.spacing.md,
-                minHeight: 52,
-              }}
-            >
-              <Icon name="archive" size={18} color={theme.colors.text.primary} />
-              <ThemedText variant="body">{strings.today.menuViewArchived}</ThemedText>
-            </PressableScale>
-            <View style={{ height: 1, backgroundColor: theme.colors.border.default }} />
-            <PressableScale
-              onPress={onExportBackup}
-              accessibilityRole="button"
-              accessibilityLabel={strings.today.menuExportBackup}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: theme.spacing.md,
-                paddingHorizontal: theme.spacing.md,
-                minHeight: 52,
-              }}
-            >
-              <Icon name="export" size={18} color={theme.colors.text.primary} />
-              <ThemedText variant="body">{strings.today.menuExportBackup}</ThemedText>
-            </PressableScale>
+            <View style={{ paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.xs }}>
+              <ThemedText variant="footnote" color="secondary" style={{ fontWeight: "600" }}>
+                {strings.today.listFilterTitle.toUpperCase()}
+              </ThemedText>
+            </View>
+            {(
+              [
+                ["all", strings.today.listFilterAll],
+                ["withTasks", strings.today.listFilterWithTasks],
+                ["completed", strings.today.listFilterCompleted],
+              ] as [ListFilter, string][]
+            ).map(([value, label], index) => {
+              const selected = listFilter === value;
+              return (
+                <View key={value}>
+                  {index > 0 ? (
+                    <View style={{ height: 1, backgroundColor: theme.colors.border.default }} />
+                  ) : null}
+                  <PressableScale
+                    onPress={() => {
+                      setListFilter(value);
+                      setListsMenuOpen(false);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={label}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: theme.spacing.md,
+                      paddingHorizontal: theme.spacing.md,
+                      minHeight: 52,
+                    }}
+                  >
+                    <ThemedText
+                      variant="body"
+                      style={{
+                        flex: 1,
+                        fontWeight: selected ? "600" : "400",
+                        color: selected ? theme.colors.accent.default : theme.colors.text.primary,
+                      }}
+                    >
+                      {label}
+                    </ThemedText>
+                    {selected ? (
+                      <Icon name="check" size={16} color={theme.colors.accent.default} />
+                    ) : null}
+                  </PressableScale>
+                </View>
+              );
+            })}
           </View>
 
           <PressableScale
-            onPress={() => setMenuOpen(false)}
+            onPress={() => setListsMenuOpen(false)}
             accessibilityRole="button"
             accessibilityLabel={strings.today.menuCancel}
             style={{
@@ -402,27 +581,47 @@ export default function TodayScreen() {
               {strings.today.menuCancel}
             </ThemedText>
           </PressableScale>
-        </PressableScale>
+          </Animated.View>
+        </Animated.View>
       </Modal>
 
       <ConfirmDialog
-        visible={pendingDelete !== null}
-        title={strings.today.deleteTitle(pendingDelete?.habit.name ?? "")}
-        message={strings.today.deleteMessage}
-        confirmLabel={strings.today.deleteConfirm}
-        cancelLabel={strings.today.cancel}
+        visible={pendingDeleteTask !== null}
+        title={strings.todayTasks.deleteTitle(pendingDeleteTask?.name ?? "")}
+        message={strings.todayTasks.deleteMessage}
+        confirmLabel={strings.todayTasks.deleteConfirm}
+        cancelLabel={strings.todayTasks.cancel}
         icon="trash"
         iconColor="red"
         destructive
-        onConfirm={async () => {
-          const target = pendingDelete;
-          setPendingDelete(null);
+        onConfirm={() => {
+          const target = pendingDeleteTask;
+          setPendingDeleteTask(null);
           if (!target) return;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          await remove(target.habit.id);
+          setRemovingTaskId(target.id);
+          setTimeout(() => {
+            deleteTask(target.id);
+            setRemovingTaskId(null);
+          }, theme.motion.duration.listItemExit);
+          setTimeout(() => {
+            useSuccessOverlayStore.getState().show(strings.todayTasks.deletedMessage, "trash");
+          }, theme.motion.duration.default);
         }}
-        onDismiss={() => setPendingDelete(null)}
+        onDismiss={() => setPendingDeleteTask(null)}
       />
+
+      <TaskDetailSheet
+        task={viewingTask}
+        habitColor={viewingTask?.color ?? viewingTaskHabitColor ?? "blue"}
+        onClose={() => setViewingTask(null)}
+        onEdit={(task) => {
+          setViewingTask(null);
+          onEditTask(task);
+        }}
+      />
+
+      <TaskEditSheet task={editingTask} onClose={() => setEditingTask(null)} />
 
       <ConfirmDialog
         visible={notice.visible}

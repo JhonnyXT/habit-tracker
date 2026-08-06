@@ -29,6 +29,7 @@ import { getHabitsUseCase } from '@/features/habits/domain/use-cases/get-habits'
 import { getHabitUseCase } from '@/features/habits/domain/use-cases/get-habit';
 import { getHabitDetailUseCase } from '@/features/habits/domain/use-cases/get-habit-detail';
 import { getHabitTasksUseCase } from '@/features/habits/domain/use-cases/get-habit-tasks';
+import { getTaskUseCase } from '@/features/habits/domain/use-cases/get-task';
 import { toggleTaskCompletionUseCase } from '@/features/habits/domain/use-cases/toggle-task-completion';
 import { createTaskUseCase } from '@/features/habits/domain/use-cases/create-task';
 import { editTaskUseCase } from '@/features/habits/domain/use-cases/edit-task';
@@ -70,7 +71,8 @@ async function build() {
     getHabitDetail: getHabitDetailUseCase(habits, completions),
 
     getHabitTasks: getHabitTasksUseCase(tasks, taskCompletions),
-    toggleTaskCompletion: toggleTaskCompletionUseCase(taskCompletions),
+    getTask: getTaskUseCase(tasks),
+    toggleTaskCompletion: toggleTaskCompletionUseCase(taskCompletions, tasks, habits, completions),
     createTask: createTaskUseCase(habits, tasks),
     editTask: editTaskUseCase(tasks),
     deleteTask: deleteTaskUseCase(tasks, taskCompletions),
