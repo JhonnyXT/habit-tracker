@@ -4,6 +4,7 @@ import type { Habit, Schedule } from '@/features/habits/domain/entities/habit';
 import { MAX_HABIT_NAME_LENGTH } from '@/features/habits/domain/entities/habit';
 import type { HabitRepository } from '@/features/habits/domain/repositories/habit-repository';
 import { newId } from '@/features/habits/domain/id';
+import { capitalize } from '@/features/habits/domain/text';
 
 export type CreateHabitInput = {
   name: string;
@@ -18,7 +19,7 @@ export type CreateHabitResult =
 
 export function createHabitUseCase(habits: HabitRepository) {
   return async (input: CreateHabitInput): Promise<CreateHabitResult> => {
-    const name = input.name.trim();
+    const name = capitalize(input.name.trim());
     if (name.length === 0) return { ok: false, error: 'empty-name' };
     if (name.length > MAX_HABIT_NAME_LENGTH) return { ok: false, error: 'name-too-long' };
 

@@ -93,8 +93,15 @@ Detailed personas live in `User-Personas.md`. At a summary level, the applicatio
 ### Reminders
 
 - Schedule one or more local notifications per habit.
+- For daily-schedule habits only: an optional pre-reminder (fixed offset before the main time) and a single optional follow-up (fixed offset after), per `Roadmap.md`'s multi-alert reminders item — capped and schedule-restricted to stay within the Charter's Calm Technology guidance and the OS's pending-notification ceiling.
 - Notification deep-links into the relevant habit.
 - Respect device-level notification permissions and Do Not Disturb settings.
+
+### Habit Tasks (checklist)
+
+- A habit may optionally have a small set of repeatable daily tasks (steps), created either from the habit's detail screen or from the main "+" entry point.
+- Task completion is tracked per day and shown as a percentage in Habit Detail and as a lightweight indicator on the Today/Habits rows.
+- Task completion is **fully independent of the habit's streak** — it is a motivational indicator, never a gate. This is distinct from the rejected "notes or journaling attached to habits" scope below: tasks are structured, actionable checklist items, not freeform reflection.
 
 ### Home Screen Widget
 
@@ -131,7 +138,7 @@ These follow directly from the Charter's Non-Goals and are explicitly deferred:
 - Gamification systems beyond streaks (points, badges, levels, rewards).
 - Advertisements or paywalled subscriptions.
 - Habit categories or grouping.
-- Notes or journaling attached to habits.
+- Notes or journaling attached to habits. (Habit Tasks, added per `Roadmap.md`, are structured checklist steps, not freeform notes — this exclusion still stands for free-text journaling.)
 - Apple Health / Google Fit / wearable integrations.
 - AI-generated habit suggestions or coaching.
 
@@ -187,8 +194,10 @@ Full schema lives in `Data-Models.md`. At a conceptual level, V1 requires:
 
 - **Habit** — identity, name, icon, color, schedule, reminder configuration, archived flag, order.
 - **Completion** — reference to a habit, a date, and a done/not-done state.
+- **Task** — reference to a habit, a name, order, archived flag; repeats daily alongside its habit.
+- **Task Completion** — reference to a task, a date, and a done/not-done state. Never contributes to streak calculation.
 
-Streaks and aggregate consistency are derived from Completions; they are not stored as independent mutable state.
+Streaks and aggregate consistency are derived from Completions only; they are not stored as independent mutable state, and Task Completions never feed into them.
 
 ---
 

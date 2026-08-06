@@ -4,6 +4,6 @@ import type { ReminderRepository } from '@/features/reminders/domain/repositorie
 export function getHabitReminderUseCase(reminders: ReminderRepository) {
   return async (habitId: string): Promise<Reminder | null> => {
     const existing = await reminders.getForHabit(habitId);
-    return existing[0] ?? null;
+    return existing.find((reminder) => reminder.kind === 'main') ?? null;
   };
 }

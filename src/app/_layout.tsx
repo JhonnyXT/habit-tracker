@@ -12,7 +12,7 @@ import { getDatabase } from '@/core/data';
 import { getUseCases } from '@/core/di';
 import { useAppTheme } from '@/core/theme';
 import { useAppearanceStore } from '@/core/theme/appearance-store';
-import { ThemedView } from '@/core/ui';
+import { ThemedView, SuccessOverlay } from '@/core/ui';
 import { useOnboardingStore } from '@/features/onboarding/presentation/store';
 import { useReminderNavigation } from '@/features/reminders/presentation/use-reminder-navigation';
 
@@ -83,12 +83,21 @@ export default function RootLayout() {
           <Stack.Protected guard={!pending}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="habit/[id]" />
-            <Stack.Screen name="habit-form" options={{ presentation: 'modal' }} />
+            <Stack.Screen
+              name="habit-form"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.9],
+                sheetGrabberVisible: true,
+                sheetCornerRadius: theme.radius.xl,
+              }}
+            />
           </Stack.Protected>
         </Stack>
       ) : (
         <ThemedView style={{ flex: 1 }} />
       )}
+      <SuccessOverlay />
     </GestureHandlerRootView>
   );
 }

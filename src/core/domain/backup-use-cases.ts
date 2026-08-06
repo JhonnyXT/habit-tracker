@@ -1,6 +1,7 @@
 import {
   backupFileName,
   backupToHabits,
+  backupToTasks,
   buildBackup,
   parseBackup,
   type BackupErrorCode,
@@ -13,6 +14,10 @@ import type {
   CompletionRepository,
   HabitRepository,
 } from '@/features/habits/domain/repositories/habit-repository';
+import type {
+  TaskRepository,
+  TaskCompletionRepository,
+} from '@/features/habits/domain/repositories/task-repository';
 import type { NotificationScheduler } from '@/features/reminders/domain/notification-scheduler';
 import type { ReminderRepository } from '@/features/reminders/domain/repositories/reminder-repository';
 
@@ -28,13 +33,29 @@ export function exportDataUseCase(
   completions: CompletionRepository,
   reminders: ReminderRepository,
   files: BackupFileStore,
+  tasks: TaskRepository,
+  taskCompletions: TaskCompletionRepository,
 ) {
   return async (): Promise<ExportResult> => {
     const all = await habits.getAll(true);
     if (all.length === 0) return { status: 'empty' };
 
     const exportedAt = new Date();
-    const backup = buildBackup(all, await completions.getAll(), await reminders.getAll(), exportedAt);
+    const allTasks = (
+      await Promise.all(all.map((habit) => tasks.getForHabit(habit.id, true)))
+    ).flat();
+    const allTaskCompletions = (
+      await Promise.all(allTasks.map((task) => taskCompletions.getHistory(task.id)))
+    ).flat();
+
+    const backup = buildBackup(
+      all,
+      await completions.getAll(),
+      await reminders.getAll(),
+      exportedAt,
+      allTasks,
+      allTaskCompletions,
+    );
 
     const shared = await files.writeAndShare(
       backupFileName(exportedAt),
@@ -86,6 +107,8 @@ export function restoreBackupUseCase(
   completions: CompletionRepository,
   reminders: ReminderRepository,
   scheduler: NotificationScheduler,
+  tasks: TaskRepository,
+  taskCompletions: TaskCompletionRepository,
 ) {
   return async (file: BackupFile): Promise<void> => {
     await scheduler.cancelAll();
@@ -93,6 +116,8 @@ export function restoreBackupUseCase(
     for (const habit of await habits.getAll(true)) {
       await reminders.deleteForHabit(habit.id);
       await completions.deleteForHabit(habit.id);
+      await taskCompletions.deleteForHabit(habit.id);
+      await tasks.deleteForHabit(habit.id);
       await habits.delete(habit.id);
     }
 
@@ -106,6 +131,14 @@ export function restoreBackupUseCase(
 
     for (const reminder of file.reminders) {
       await reminders.upsert(reminder);
+    }
+
+    for (const task of backupToTasks(file)) {
+      await tasks.upsert(task);
+    }
+
+    for (const taskCompletion of file.taskCompletions) {
+      await taskCompletions.upsert(taskCompletion);
     }
   };
 }

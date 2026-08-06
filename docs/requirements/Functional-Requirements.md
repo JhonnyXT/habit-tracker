@@ -74,6 +74,7 @@ Translate `User-Stories.md` into unambiguous functional rules that engineering i
 - FR-6.2 Enabling a reminder MUST request OS notification permission only at that point, not at first launch.
 - FR-6.3 Tapping a notification MUST deep-link into the app directly to the associated habit's context.
 - FR-6.4 If notification permission is denied or revoked, the app MUST degrade gracefully — reminder settings remain visible but clearly indicate they are inactive, without crashing or silently failing.
+- FR-6.5 For habits scheduled daily, the app MAY offer one optional pre-reminder (fixed offset before the main time) and one optional follow-up (fixed offset after). This MUST NOT be offered for weekday- or times-per-week-scheduled habits, to stay within the OS's pending local notification ceiling (see `Roadmap.md`'s multi-alert reminders item and `decisions/ADR-005.md`).
 
 ---
 
@@ -107,6 +108,15 @@ Translate `User-Stories.md` into unambiguous functional rules that engineering i
 - FR-10.2 Text MUST scale correctly at all Dynamic Type / font-scale sizes the target platforms support, without truncation or overlapping layout.
 - FR-10.3 When the OS Reduced Motion setting is enabled, non-essential animations MUST be disabled or replaced with a simplified equivalent.
 - FR-10.4 All touch targets MUST meet or exceed platform minimum size guidelines.
+
+---
+
+# FR-11 — Habit Tasks
+
+- FR-11.1 A habit MAY have zero or more repeatable daily tasks (steps), created either from the habit's own detail screen or from the main creation entry point.
+- FR-11.2 A task's completion state is tracked per day, independently of the habit's own completion for that day.
+- FR-11.3 Task completion MUST NEVER factor into streak calculation. Marking or unmarking a task MUST NOT change a habit's current or longest streak.
+- FR-11.4 The app MUST show the day's task completion as a percentage in the habit's detail screen, and MAY show a lightweight version of the same indicator on the habit's row in the Today and Habits lists.
 
 ---
 

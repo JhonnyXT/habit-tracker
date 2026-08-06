@@ -12,6 +12,7 @@ import {
 } from '@/features/habits/presentation/components/habit-card';
 import { DraggableHabitList } from '@/features/habits/presentation/components/draggable-habit-list';
 import { useHabitsStore } from '@/features/habits/presentation/store';
+import { useCreateSheetStore } from '@/features/habits/presentation/create-sheet-store';
 
 const CARD_GAP = 8;
 
@@ -21,6 +22,7 @@ export default function HabitsScreen() {
   const archived = useHabitsStore((state) => state.archived);
   const loadHabits = useHabitsStore((state) => state.loadHabits);
   const reorder = useHabitsStore((state) => state.reorder);
+  const openCreateSheet = useCreateSheetStore((store) => store.open);
 
   useFocusEffect(
     useCallback(() => {
@@ -43,7 +45,7 @@ export default function HabitsScreen() {
             {strings.habits.title}
           </ThemedText>
           <PressableScale
-            onPress={() => router.push('/habit-form')}
+            onPress={openCreateSheet}
             accessibilityRole="button"
             accessibilityLabel={strings.a11y.addHabit}
             style={{
@@ -60,7 +62,7 @@ export default function HabitsScreen() {
         </Enter>
 
         {habits.length === 0 && archived.length === 0 ? (
-          <EmptyState title={strings.habits.emptyTitle} message={strings.habits.emptyMessage} />
+          <EmptyState title={strings.habits.emptyTitle} message={strings.habits.emptyMessage} deck />
         ) : (
           <Enter index={1}>
             <DraggableHabitList

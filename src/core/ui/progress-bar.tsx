@@ -13,9 +13,11 @@ import { useAppTheme } from '@/core/theme';
 type ProgressBarProps = {
   value: number;
   height?: number;
+  trackColor?: string;
+  fillColor?: string;
 };
 
-export function ProgressBar({ value, height = 4 }: ProgressBarProps) {
+export function ProgressBar({ value, height = 4, trackColor, fillColor }: ProgressBarProps) {
   const theme = useAppTheme();
   const reducedMotion = useReducedMotion();
   const progress = useSharedValue(value);
@@ -36,7 +38,7 @@ export function ProgressBar({ value, height = 4 }: ProgressBarProps) {
       style={{
         height,
         borderRadius: theme.radius.full,
-        backgroundColor: theme.colors.surface.elevated,
+        backgroundColor: trackColor ?? theme.colors.surface.elevated,
         overflow: 'hidden',
       }}
     >
@@ -46,7 +48,7 @@ export function ProgressBar({ value, height = 4 }: ProgressBarProps) {
             width: '100%',
             height,
             borderRadius: theme.radius.full,
-            backgroundColor: theme.colors.accent.default,
+            backgroundColor: fillColor ?? theme.colors.accent.default,
             transformOrigin: 'left',
           },
           fillStyle,

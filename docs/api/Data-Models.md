@@ -63,9 +63,43 @@ Note: there is deliberately no `streak` column anywhere in this schema — strea
 |--------|------|-------------|-------|
 | `id` | TEXT (UUID) | PRIMARY KEY | |
 | `habit_id` | TEXT | NOT NULL, FOREIGN KEY → `habits.id` | A habit may have zero or more reminders (FR-6.1). |
-| `time` | TEXT (`HH:mm`, 24h) | NOT NULL | |
+| `time` | TEXT (`HH:mm`, 24h) | NOT NULL | Already the effective time for `pre`/`followup` rows (see `kind`) — a fixed offset applied once, not recomputed at schedule time (`decisions/ADR-008.md`). |
 | `enabled` | BOOLEAN | NOT NULL, default `true` | |
 | `created_at` | TEXT (ISO 8601) | NOT NULL | |
+| `kind` | TEXT | NOT NULL, default `'main'`, one of `main` \| `pre` \| `followup` | FR-6.5. A habit may have at most one row per kind, and `pre`/`followup` only ever exist for daily-schedule habits (`decisions/ADR-008.md`). |
+
+---
+
+# Entity: Task
+
+A habit may optionally have a small set of repeatable daily tasks (steps) — see `Roadmap.md`'s "Tasks per habit" item. Task completion is tracked separately from `Completion` and never feeds into streak calculation.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | TEXT (UUID) | PRIMARY KEY | |
+| `habit_id` | TEXT | NOT NULL, FOREIGN KEY → `habits.id` | A habit may have zero or more tasks. |
+| `name` | TEXT | NOT NULL, max 60 chars | Same length rule as `habits.name`. |
+| `sort_order` | INTEGER | NOT NULL | Explicit, creation-order for v1 (no manual reordering yet). |
+| `archived` | BOOLEAN | NOT NULL, default `false` | |
+| `created_at` | TEXT (ISO 8601) | NOT NULL | |
+| `updated_at` | TEXT (ISO 8601) | NOT NULL | |
+
+---
+
+# Entity: TaskCompletion
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | TEXT (UUID) | PRIMARY KEY | |
+| `task_id` | TEXT | NOT NULL, FOREIGN KEY → `tasks.id` | |
+| `date` | TEXT (ISO 8601 date, no time) | NOT NULL | |
+| `created_at` | TEXT (ISO 8601) | NOT NULL | |
+
+**Constraint:** `UNIQUE(task_id, date)` — same integrity rule as `Completion`.
+
+**Index:** `(task_id, date)`.
+
+Note: deliberately isolated from `habits`/`completions` — a habit's streak is computed purely from `Completion` rows and never reads `tasks`/`task_completions`, by construction (no code path joins them).
 
 ---
 
@@ -103,6 +137,23 @@ type Reminder = {
   habitId: string
   time: string    // HH:mm
   enabled: boolean
+  kind: 'main' | 'pre' | 'followup'
+}
+
+type Task = {
+  id: string
+  habitId: string
+  name: string
+  sortOrder: number
+  archived: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+type TaskCompletion = {
+  id: string
+  taskId: string
+  date: string    // ISO date, no time component
 }
 ```
 
@@ -120,12 +171,15 @@ Per FR-9.1, the export file is a serialization of these Domain entities — not 
   "exportedAt": "2026-07-30T12:00:00Z",
   "habits": [ /* Habit[] */ ],
   "completions": [ /* Completion[] */ ],
-  "reminders": [ /* Reminder[] */ ]
+  "reminders": [ /* Reminder[] */ ],
+  "tasks": [ /* Task[] */ ],
+  "taskCompletions": [ /* TaskCompletion[] */ ]
 }
 ```
 
 - `formatVersion` allows future import logic to handle older export files without guessing.
 - Import validation (FR-9.2) checks `formatVersion` and the shape of each array before any database write occurs.
+- `tasks`/`taskCompletions` are treated as optional on import: a backup file written before Habit Tasks existed has neither array, and is parsed as if both were empty rather than rejected — `formatVersion` was not bumped for this addition since it is purely additive.
 
 ---
 

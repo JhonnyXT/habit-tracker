@@ -15,22 +15,26 @@ export function archiveHabitUseCase(
     const habit = { ...existing, archived, updatedAt: new Date() };
     await habits.upsert(habit);
 
-    const reminder = (await reminders.getForHabit(id))[0];
-    if (!reminder?.enabled) return;
+    const habitReminders = (await reminders.getForHabit(id)).filter((reminder) => reminder.enabled);
+    if (habitReminders.length === 0) return;
 
     if (archived) {
-      await scheduler.cancel(reminder.id);
+      for (const reminder of habitReminders) {
+        await scheduler.cancel(reminder.id);
+      }
       return;
     }
 
     if ((await scheduler.getPermission()) === 'granted') {
-      await scheduler.schedule({
-        reminderId: reminder.id,
-        habitId: habit.id,
-        habitName: habit.name,
-        time: reminder.time,
-        days: daysFor(habit),
-      });
+      for (const reminder of habitReminders) {
+        await scheduler.schedule({
+          reminderId: reminder.id,
+          habitId: habit.id,
+          habitName: habit.name,
+          time: reminder.time,
+          days: daysFor(habit),
+        });
+      }
     }
   };
 }

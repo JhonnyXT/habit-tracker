@@ -22,14 +22,15 @@ export class SqliteReminderRepository implements ReminderRepository {
 
   async upsert(reminder: Reminder): Promise<void> {
     await this.db.runAsync(
-      `INSERT INTO reminders (id, habit_id, time, enabled, created_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET time = excluded.time, enabled = excluded.enabled`,
+      `INSERT INTO reminders (id, habit_id, time, enabled, created_at, kind)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET time = excluded.time, enabled = excluded.enabled, kind = excluded.kind`,
       reminder.id,
       reminder.habitId,
       reminder.time,
       reminder.enabled ? 1 : 0,
       new Date().toISOString(),
+      reminder.kind,
     );
   }
 

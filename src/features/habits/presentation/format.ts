@@ -2,6 +2,7 @@ import { strings } from '@/core/i18n';
 import { fromISODate, type ISODate } from '@/features/habits/domain/date';
 import type { Schedule } from '@/features/habits/domain/entities/habit';
 import type { Streaks } from '@/features/habits/domain/streak';
+import type { TaskProgress } from '@/features/habits/domain/task-progress';
 
 export function describeSchedule(schedule: Schedule): string {
   switch (schedule.type) {
@@ -16,6 +17,10 @@ export function describeSchedule(schedule: Schedule): string {
 
 export function describeStreak(streaks: Streaks): string {
   return strings.habits.streak(streaks.current, streaks.unit);
+}
+
+export function describeTaskProgress(progress: TaskProgress): string {
+  return strings.tasks.progress(progress.completedCount, progress.totalCount);
 }
 
 export function formatToday(date: Date): string {
@@ -46,4 +51,12 @@ export function formatDayLong(iso: ISODate): string {
     day: 'numeric',
     month: 'long',
   });
+}
+
+export function formatDeadline(date: Date): string {
+  const day = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace('.', '');
+  const time = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true }).format(
+    date,
+  );
+  return `${day} · ${time}`;
 }

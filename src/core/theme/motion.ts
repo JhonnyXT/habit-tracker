@@ -13,6 +13,8 @@ export const duration = {
   fast: 150,
   default: 250,
   slow: 350,
+
+  listItemExit: 200,
 } as const;
 
 export const pressScale = 0.97;
