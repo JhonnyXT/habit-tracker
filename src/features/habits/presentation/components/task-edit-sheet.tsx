@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -59,9 +59,10 @@ export function TaskEditSheet({ task, onClose }: TaskEditSheetProps) {
   const [deadlineTime, setDeadlineTime] = useState(() => timeFromDeadline(null));
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadedTaskId, setLoadedTaskId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!task) return;
+  if (task && task.id !== loadedTaskId) {
+    setLoadedTaskId(task.id);
     setName(task.name);
     setNotes(task.notes ?? '');
     setUrgent(task.urgent);
@@ -77,7 +78,7 @@ export function TaskEditSheet({ task, onClose }: TaskEditSheetProps) {
       setDeadlineMonth(startOfMonth(todayISODate()));
       setDeadlineTime(timeFromDeadline(null));
     }
-  }, [task]);
+  }
 
   const visible = task !== null;
   const displayTask = useRetainedValue(task);

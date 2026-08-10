@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 
 import { spring, duration } from '@/core/theme/motion';
@@ -12,9 +12,12 @@ export function useModalProgress(visible: boolean): ModalProgress {
   const [shouldRender, setShouldRender] = useState(visible);
   const progress = useSharedValue(visible ? 1 : 0);
 
+  if (visible && !shouldRender) {
+    setShouldRender(true);
+  }
+
   useEffect(() => {
     if (visible) {
-      setShouldRender(true);
       progress.value = withSpring(1, spring.sheet);
       return;
     }
@@ -28,7 +31,9 @@ export function useModalProgress(visible: boolean): ModalProgress {
 }
 
 export function useRetainedValue<T>(value: T | null): T | null {
-  const ref = useRef<T | null>(value);
-  if (value !== null) ref.current = value;
-  return ref.current;
+  const [retained, setRetained] = useState(value);
+  if (value !== null && value !== retained) {
+    setRetained(value);
+  }
+  return retained;
 }

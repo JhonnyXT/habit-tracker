@@ -6,5 +6,11 @@ module.exports = defineConfig([
   expoConfig,
   {
     ignores: ["dist/*"],
-  }
+  },
+  {
+    // See docs/decisions/ADR-009.md.
+    rules: {
+      "react-hooks/immutability": "off",
+    },
+  },
 ]);

@@ -150,13 +150,6 @@ export default function HabitFormScreen() {
     };
   }, [id]);
 
-  useEffect(() => {
-    if (scheduleType !== 'daily') {
-      setPreReminderEnabled(false);
-      setFollowupReminderEnabled(false);
-    }
-  }, [scheduleType]);
-
   const onToggleReminder = async (enabled: boolean) => {
     Haptics.selectionAsync();
     setReminderEnabled(enabled);
@@ -419,6 +412,10 @@ export default function HabitFormScreen() {
                 onChange={(value) => {
                   Haptics.selectionAsync();
                   setScheduleType(value);
+                  if (value !== 'daily') {
+                    setPreReminderEnabled(false);
+                    setFollowupReminderEnabled(false);
+                  }
                 }}
                 options={[
                   { value: 'daily', label: strings.form.daily },

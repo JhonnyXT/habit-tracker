@@ -22,6 +22,10 @@ export function useDayComplete(done: number, total: number): boolean {
   const previousDone = useRef<number | null>(null);
   const [celebrating, setCelebrating] = useState(false);
 
+  if (!complete && celebrating) {
+    setCelebrating(false);
+  }
+
   useEffect(() => {
     const justCompleted = previousDone.current !== null && previousDone.current < done && complete;
     previousDone.current = done;
@@ -34,10 +38,6 @@ export function useDayComplete(done: number, total: number): boolean {
     const timer = setTimeout(() => setCelebrating(false), VISIBLE_MS);
     return () => clearTimeout(timer);
   }, [done, complete]);
-
-  useEffect(() => {
-    if (!complete) setCelebrating(false);
-  }, [complete]);
 
   return celebrating;
 }

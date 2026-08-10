@@ -194,12 +194,13 @@ export function CreateSheet() {
     };
   }, [visible]);
 
-  useEffect(() => {
-    if (scheduleType !== 'daily') {
+  const onScheduleTypeChange = (value: Schedule['type']) => {
+    setScheduleType(value);
+    if (value !== 'daily') {
       setPreReminderEnabled(false);
       setFollowupReminderEnabled(false);
     }
-  }, [scheduleType]);
+  };
 
   const reset = () => {
     setMode('habit');
@@ -533,7 +534,7 @@ export function CreateSheet() {
         color={color}
         onColorChange={setColor}
         scheduleType={scheduleType}
-        onScheduleTypeChange={setScheduleType}
+        onScheduleTypeChange={onScheduleTypeChange}
         selectedDays={selectedDays}
         onSelectedDaysChange={setSelectedDays}
         timesPerWeek={timesPerWeek}

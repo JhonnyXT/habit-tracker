@@ -66,7 +66,7 @@ export function SuccessOverlay() {
       accessibilityLiveRegion="polite"
       accessibilityLabel={message}
       style={[
-        StyleSheet.absoluteFillObject,
+        StyleSheet.absoluteFill,
         {
           backgroundColor: theme.colors.surface.scrim,
           alignItems: 'center',
