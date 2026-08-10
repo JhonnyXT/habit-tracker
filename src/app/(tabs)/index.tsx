@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withTiming,
@@ -19,6 +19,7 @@ import {
   EmptyState,
   Enter,
   ConfirmDialog,
+  SearchField,
   useModalProgress,
   useSuccessOverlayStore,
 } from "@/core/ui";
@@ -183,6 +184,7 @@ export default function TodayScreen() {
           gap: theme.spacing.md,
         }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <Enter
           index={0}
@@ -270,25 +272,12 @@ export default function TodayScreen() {
         </Enter>
 
         {searchOpen ? (
-          <Enter index={1} lift={false}>
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder={strings.today.searchPlaceholder}
-              placeholderTextColor={theme.colors.text.secondary}
-              autoFocus
-              returnKeyType="search"
-              accessibilityLabel={strings.a11y.searchHabits}
-              style={{
-                ...theme.typography.body,
-                color: theme.colors.text.primary,
-                backgroundColor: theme.colors.surface.secondary,
-                borderRadius: theme.radius.lg,
-                paddingHorizontal: theme.spacing.md,
-                minHeight: 44,
-              }}
-            />
-          </Enter>
+          <SearchField
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={strings.today.searchPlaceholder}
+            autoFocus
+          />
         ) : null}
 
         {isLoading ? null : today.length === 0 ? (
@@ -366,7 +355,7 @@ export default function TodayScreen() {
                       </View>
                     )}
                     renderItem={(entry, { expanded }) => (
-                      <View style={{ paddingBottom: CARD_GAP }}>
+                      <View style={{ paddingBottom: CARD_GAP, position: "relative" }}>
                         <HabitRow
                           habit={entry.habit}
                           subtitle={subtitleFor(entry)}
@@ -378,6 +367,20 @@ export default function TodayScreen() {
                           expandable={entry.tasks.length > 0 || expanded}
                           expanded={expanded}
                         />
+                        {!expanded ? (
+                          <View
+                            pointerEvents="none"
+                            style={{
+                              position: "absolute",
+                              left: theme.spacing.lg,
+                              right: theme.spacing.lg,
+                              bottom: (CARD_GAP - 1) / 2,
+                              height: 1,
+                              backgroundColor: theme.colors.border.default,
+                              opacity: 0.6,
+                            }}
+                          />
+                        ) : null}
                       </View>
                     )}
                   />

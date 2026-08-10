@@ -37,14 +37,25 @@ export function DailyGoal({ done, total }: DailyGoalProps) {
     marginRight: interpolate(lit.value, [0, 1], [0, theme.spacing.xs]),
   }));
 
+  const glowStyle = useAnimatedStyle(() => ({
+    shadowOpacity: interpolate(lit.value, [0, 1], [0, theme.scheme === 'dark' ? 0.5 : 0.3]),
+    elevation: interpolate(lit.value, [0, 1], [0, 8]),
+  }));
+
   return (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface.secondary,
-        borderRadius: theme.radius.lg,
-        padding: theme.spacing.md,
-        gap: theme.spacing.sm,
-      }}
+    <Animated.View
+      style={[
+        {
+          backgroundColor: theme.colors.surface.secondary,
+          borderRadius: theme.radius.lg,
+          padding: theme.spacing.md,
+          gap: theme.spacing.sm,
+          shadowColor: theme.colors.accent.default,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 0 },
+        },
+        glowStyle,
+      ]}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <ThemedText variant="footnote" color="secondary">
@@ -67,6 +78,6 @@ export function DailyGoal({ done, total }: DailyGoalProps) {
       </View>
 
       <ProgressBar value={total > 0 ? done / total : 0} />
-    </View>
+    </Animated.View>
   );
 }

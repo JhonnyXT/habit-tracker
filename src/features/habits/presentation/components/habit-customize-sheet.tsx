@@ -129,6 +129,9 @@ export function HabitCustomizeSheet({
               borderTopLeftRadius: theme.radius.xl,
               borderTopRightRadius: theme.radius.xl,
               backgroundColor: theme.colors.surface.primary,
+              borderWidth: 1.5,
+              borderBottomWidth: 0,
+              borderColor: theme.colors.accent.glow,
             },
             cardStyle,
           ]}

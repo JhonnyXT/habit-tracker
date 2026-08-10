@@ -62,6 +62,7 @@ export const colors = {
     accent: {
       default: '#E85D26',
       subtle: '#FDEDE5',
+      glow: 'rgba(232, 93, 38, 0.28)',
     },
     habit: habitLight,
     state: {
@@ -93,6 +94,7 @@ export const colors = {
     accent: {
       default: '#FF884D',
       subtle: '#3A2016',
+      glow: 'rgba(255, 136, 77, 0.4)',
     },
     habit: habitDark,
     state: {
