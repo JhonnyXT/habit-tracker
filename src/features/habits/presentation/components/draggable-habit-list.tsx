@@ -478,8 +478,9 @@ export function DraggableHabitList<T>({
     [expandedId, collapse, expandedIdSV, expandedPosSV, extraHeightSV, positions],
   );
 
+  const itemCount = items.length;
   const containerStyle = useAnimatedStyle(() => ({
-    height: items.length * slot + extraHeightSV.value,
+    height: itemCount * slot + extraHeightSV.value,
   }));
 
   return (
