@@ -4,6 +4,26 @@ Local-first habit tracking app. React Native + Expo + TypeScript. Android dev bu
 
 ---
 
+## Active initiative: Expo SDK 54 → 57 upgrade, then adopt Expo UI
+
+Developed directly on `main` (the `expo-sdk-57-upgrade` branch that started this work is abandoned — left in place on GitHub but not synced further; don't build on it). Goal: real platform-native controls — SwiftUI on iOS, Material 3 on Android, from one component tree — via `@expo/ui`, per `docs/research/expo-ui.md`'s recommendation. This reads directly on the Charter's own **Native First** / **Platform Fidelity** principles (`00-Project-Charter.md`, `03-Design-System.md`): this app is *supposed* to look native per platform, not identical across both. `@expo/ui` has no release for SDK 54 (jumps 55→56/57), so the SDK bump is a prerequisite, done before touching any screen.
+
+Note the overlap with the NativeWind initiative below: NativeWind is a *styling* system (Tailwind classes on regular RN views, still JS-rendered); `@expo/ui` renders *actual* native views. They're two different answers to the same "Native First" goal. Reconciling which one Settings ends up on (it currently runs NativeWind) is part of this initiative's job once the pilot lands — not decided yet.
+
+Target: **SDK 57** directly (skip 55/56 as intermediate stops). Known deltas from the current versions (`react` 19.1.0, `react-native` 0.81.5, `expo-router` ~6.0.24, `react-native-reanimated` ~4.1.1, `react-native-gesture-handler` ~2.28.0, `react-native-worklets` 0.5.1, `expo-notifications` ~0.32.17, `expo-sqlite` ~16.0.10, `@expo/vector-icons` ^15.0.3, `nativewind` ^4.2.6):
+
+- React Native 0.81 → 0.86, React 19.1 → 19.2.
+- **expo-router decouples from React Navigation** (SDK 56) — codemod: `npx expo-codemod sdk-56-expo-router-react-navigation-replace`. Re-check `Stack.Protected` (onboarding guard) and every `router.push`/`useFocusEffect` call still behaves.
+- **Legacy Architecture removed entirely** (SDK 55) — a no-op here, this app already runs New Architecture (Expo's default since SDK 53; `app.json` never overrides it).
+- `expo-notifications`' Firebase dependency updated (SDK 55) — re-verify reminders still schedule and fire (`ADR-005`'s exact-alarm path, and the multi-alert pre/follow-up reminders from `ADR-008`) after the bump.
+- `react-native-reanimated` 4.1 → 4.5, `react-native-worklets` 0.5 → 0.10, `react-native-gesture-handler` 2.28 → 2.32 — no breaking changes documented, but re-verify Today's gesture-heavy interactions (drag-to-reorder, the habit-row `GestureTap` nesting from point 11, `TaskCard`'s swipe) and every spring on a real device regardless.
+- `@expo/vector-icons` is being phased out in favor of `@react-native-vector-icons/*` (SDK 56) — this app uses it only as the Android fallback in `src/core/ui/icon.tsx`; swap when it actually breaks, not preemptively.
+- `nativewind`/`tailwindcss`/`babel-preset-expo` compatibility with RN 0.86 and the new Babel/Metro config is unverified — check before assuming Settings' NativeWind screens still build.
+
+Sequence once work starts: bump `expo`/run `npx expo install --check`, run the expo-router codemod, full native rebuild, then re-verify on the physical Android device — reminders (schedule + fire + deep link, both main and multi-alert), Today's gestures (drag/swipe/tap/expand), and the Sistema/Claro/Oscuro appearance toggle — before writing a single line of `@expo/ui`. Only after that passes: pilot `@expo/ui`'s universal `FieldGroup`/`Section`/`SectionHeader`/`SectionFooter` on the Settings screen first (per `docs/research/expo-ui.md`), verify on real Android **and iOS** hardware, then extend the same native-controls approach to Add/Edit Habit and Habit Detail. Today stays hand-rolled longest on purpose — it's the Charter's sacred core loop, and its drag/swipe/expand motion has no `@expo/ui` equivalent. Skip the platform-exclusive showpieces (Liquid Glass, Siri Glow, Swift Charts, Material You wallpaper theming) — each needs its own platform branch and none map to a concrete need here; Material You's wallpaper-seeded palette specifically conflicts with the fixed flame-orange brand accent (`docs/design/Colors.md`).
+
+---
+
 ## Active initiative: Reminderos-inspired redesign (merged into `main` from branch `reminderos-redesign`; still active, now developed directly on `main`)
 
 The NativeWind design-system work below (previously branch `nativewind-obytes`) is **merged into `main`** — Settings runs on it; every other screen is still `core/theme`. That initiative is paused, not abandoned; the section is kept for context on `core/ui-nw/`.
